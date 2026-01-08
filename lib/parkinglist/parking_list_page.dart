@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
+import '../location/map_page.dart';
 
 class ParkingListPage extends StatelessWidget {
   const ParkingListPage({super.key});
@@ -11,6 +12,18 @@ class ParkingListPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Places de Parking'),
         backgroundColor: AppColor.navy,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.map),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MapPage()),
+              );
+            },
+            tooltip: 'Voir sur la carte',
+          ),
+        ],
       ),
       body: ListView.builder(
         itemCount: mockParkingSpots.length,

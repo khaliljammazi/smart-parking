@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../model/parking_model.dart';
 import '../parkinglist/parking_list_page.dart';
+import '../location/map_page.dart';
 import '../utils/constanst.dart';
 import '../utils/text/regular.dart';
 import '../utils/text/semi_bold.dart';
@@ -85,11 +86,9 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                     onTap: () {
-                      // Navigate to location page (for now just show snackbar)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Navigation vers la page de localisation'),
-                        ),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MapPage()),
                       );
                     },
                   ),

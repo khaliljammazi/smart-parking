@@ -21,9 +21,27 @@ A Flutter-based mobile application for finding and booking parking spots.
 - `lib/model/`: Data models
 - `lib/utils/`: Utilities and constants
 
-## Static Implementation
+## Google Maps Setup
 
-This version uses mock data and static functionality. No backend integration yet.
+To use Google Maps functionality, you need to configure a Google Maps API key:
+
+### For Web:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. **Enable Billing**: Google Maps requires a billing account to be enabled
+4. Enable the "Maps JavaScript API"
+5. Create credentials (API Key)
+6. The API key `AIzaSyCYxFkL9vcvbaFz-Ut1Lm2Vge5byodujfk` is already configured in the app
+
+### For Android:
+1. The API key is already configured in `android/app/build.gradle.kts` and `AndroidManifest.xml`
+
+### For iOS:
+1. Add your API key to `ios/Runner/AppDelegate.swift` or create a `ios/Runner/Info.plist` entry
+
+**Important**: Google Maps requires billing to be enabled on your Google Cloud project. Without billing enabled, you'll see a "BillingNotEnabledMapError" even with a valid API key.
+
+**Note**: The API key is stored in `.env` file for environment variable management.
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)

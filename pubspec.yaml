@@ -30,6 +30,7 @@ dependencies:
   shimmer: ^3.0.0
   flutter_local_notifications: ^18.0.1
   google_maps_flutter: ^2.10.0
+  google_maps_flutter_web: ^0.5.10
   map_launcher: ^4.4.2
   flutter_secure_storage: ^10.0.0
   awesome_dialog: ^3.2.1
@@ -39,6 +40,7 @@ dependencies:
   qr_flutter: ^4.1.0  # For QR codes
   url_launcher: ^6.3.1  # For launching maps
   cached_network_image: ^3.4.1  # For images
+  flutter_dotenv: ^5.1.0  # For environment variables
 
 dev_dependencies:
   flutter_test:
