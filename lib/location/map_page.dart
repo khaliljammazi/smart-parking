@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 
@@ -18,6 +19,12 @@ class _MapPageState extends State<MapPage> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  // GPS related variables
+  Position? _currentPosition;
+  bool _isLocationLoading = false;
+  bool _locationPermissionGranted = false;
+  StreamSubscription<Position>? _positionStream;
+
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(36.8065, 10.1815), // Tunis coordinates
     zoom: 12.0,
@@ -28,6 +35,13 @@ class _MapPageState extends State<MapPage> {
     super.initState();
     _addParkingMarkers();
     _addSearchRadius();
+    _initializeLocation();
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    super.dispose();
   }
 
   void _addParkingMarkers() {
@@ -111,6 +125,120 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  // GPS Methods
+  Future<void> _initializeLocation() async {
+    await _checkLocationPermission();
+    if (_locationPermissionGranted) {
+      await _getCurrentLocation();
+      _startLocationUpdates();
+    }
+  }
+
+  Future<void> _checkLocationPermission() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    setState(() {
+      _locationPermissionGranted = permission == LocationPermission.whileInUse ||
+                                   permission == LocationPermission.always;
+    });
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLocationLoading = true;
+    });
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      setState(() {
+        _currentPosition = position;
+        _isLocationLoading = false;
+      });
+
+      // Add user location marker
+      _addUserLocationMarker();
+
+      // Optionally center map on user location
+      // await _goToUserLocation();
+    } catch (e) {
+      setState(() {
+        _isLocationLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de localisation: $e')),
+      );
+    }
+  }
+
+  void _startLocationUpdates() {
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, // Update every 10 meters
+    );
+
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) {
+      setState(() {
+        _currentPosition = position;
+      });
+      _updateUserLocationMarker();
+    });
+  }
+
+  void _addUserLocationMarker() {
+    if (_currentPosition != null) {
+      final userMarker = Marker(
+        markerId: const MarkerId('user_location'),
+        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        infoWindow: const InfoWindow(title: 'Votre position'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      );
+
+      setState(() {
+        _markers.add(userMarker);
+      });
+    }
+  }
+
+  void _updateUserLocationMarker() {
+    if (_currentPosition != null) {
+      final userMarker = Marker(
+        markerId: const MarkerId('user_location'),
+        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        infoWindow: const InfoWindow(title: 'Votre position'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      );
+
+      setState(() {
+        _markers.removeWhere((marker) => marker.markerId.value == 'user_location');
+        _markers.add(userMarker);
+      });
+    }
+  }
+
+  Future<void> _goToUserLocation() async {
+    if (_currentPosition != null) {
+      final GoogleMapController controller = await _controller.future;
+      final userLocation = CameraPosition(
+        target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        zoom: 16.0,
+      );
+      await controller.animateCamera(CameraUpdate.newCameraPosition(userLocation));
+    } else {
+      // If no current position, try to get it
+      await _getCurrentLocation();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_hasError) {
@@ -162,10 +290,35 @@ class _MapPageState extends State<MapPage> {
         title: const Text('Carte des Parkings'),
         backgroundColor: AppColor.navy,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: _goToCurrentLocation,
-          ),
+          if (_isLocationLoading)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            )
+          else if (_locationPermissionGranted && _currentPosition != null)
+            IconButton(
+              icon: const Icon(Icons.my_location),
+              tooltip: 'Aller à ma position',
+              onPressed: _goToCurrentLocation,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.location_off),
+              tooltip: 'Activer la localisation',
+              onPressed: () async {
+                await _checkLocationPermission();
+                if (_locationPermissionGranted) {
+                  await _getCurrentLocation();
+                }
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
@@ -199,12 +352,16 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _goToCurrentLocation() async {
-    final GoogleMapController controller = await _controller.future;
-    // For now, just center on Tunis. In a real app, you'd get the user's location
-    const tunis = CameraPosition(
-      target: LatLng(36.8065, 10.1815),
-      zoom: 15.0,
-    );
-    await controller.animateCamera(CameraUpdate.newCameraPosition(tunis));
+    if (!_locationPermissionGranted) {
+      await _checkLocationPermission();
+      if (!_locationPermissionGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permission de localisation requise')),
+        );
+        return;
+      }
+    }
+
+    await _goToUserLocation();
   }
 }
