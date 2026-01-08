@@ -1,0 +1,71 @@
+name: smart_parking
+description: "Smart Parking App - Find and book parking spots"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  lottie: ^3.0.0
+  flutter_svg: ^2.0.9
+  smooth_page_indicator: ^2.0.1
+  latlong2: ^0.9.1
+  table_calendar: ^3.2.0
+  intl: ^0.20.2
+  dotted_border: ^3.1.0
+  photo_view: ^0.15.0
+  share_plus: ^12.0.1
+  image_picker: ^1.2.1
+  shared_preferences: ^2.3.4
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
+  shimmer: ^3.0.0
+  flutter_local_notifications: ^18.0.1
+  google_maps_flutter: ^2.10.0
+  map_launcher: ^4.4.2
+  flutter_secure_storage: ^10.0.0
+  awesome_dialog: ^3.2.1
+  webview_flutter: ^4.10.0
+  flutter_rating_bar: ^4.0.1
+  provider: ^6.1.2
+  qr_flutter: ^4.1.0  # For QR codes
+  url_launcher: ^6.3.1  # For launching maps
+  cached_network_image: ^3.4.1  # For images
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/logo/
+    - assets/json/
+    - assets/json/empty/
+    - assets/json/inactiveuser/
+    - assets/json/loading/
+    - assets/json/otp/
+    - assets/json/pixel/
+    - assets/json/register/
