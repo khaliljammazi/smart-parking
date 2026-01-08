@@ -41,7 +41,12 @@ To use Google Maps functionality, you need to configure a Google Maps API key:
 
 **Important**: Google Maps requires billing to be enabled on your Google Cloud project. Without billing enabled, you'll see a "BillingNotEnabledMapError" even with a valid API key.
 
-**Note**: The API key is stored in `.env` file for environment variable management.
+### Environment Setup:
+1. Copy `.env` file and add your Google Maps API key:
+   ```bash
+   GOOGLE_MAPS_API_KEY=your_actual_api_key_here
+   ```
+2. **Important**: Never commit `.env` file to version control - it's already in `.gitignore`
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
