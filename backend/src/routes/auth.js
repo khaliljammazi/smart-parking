@@ -217,11 +217,11 @@ router.get('/me', protect, async (req, res) => {
 
 // Google OAuth routes
 router.get('/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', { failureRedirect: '/login', session: false }),
   async (req, res) => {
     try {
       const token = req.user.generateAuthToken();
@@ -243,11 +243,11 @@ router.get('/google/callback',
 
 // Facebook OAuth routes
 router.get('/facebook',
-  passport.authenticate('facebook', { scope: ['email'] })
+  passport.authenticate('facebook', { scope: ['email'], session: false })
 );
 
 router.get('/facebook/callback',
-  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  passport.authenticate('facebook', { failureRedirect: '/login', session: false }),
   async (req, res) => {
     try {
       const token = req.user.generateAuthToken();

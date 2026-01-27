@@ -29,7 +29,9 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: function() {
+      return !this.googleId && !this.facebookId; // Phone required for email signup only
+    },
     validate: {
       validator: function(phone) {
         return /^\+?[\d\s\-\(\)]+$/.test(phone);
@@ -54,6 +56,14 @@ const userSchema = new mongoose.Schema({
     sparse: true
   },
   facebookId: {
+    type: String,
+    sparse: true
+  },
+  githubId: {
+    type: String,
+    sparse: true
+  },
+  twitterId: {
     type: String,
     sparse: true
   },
@@ -110,6 +120,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
   emailVerificationToken: String,
   emailVerificationExpires: Date,
   passwordResetToken: String,
@@ -135,9 +150,6 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ googleId: 1 }, { sparse: true });
-userSchema.index({ facebookId: 1 }, { sparse: true });
 userSchema.index({ phone: 1 });
 
 // Virtual for full name

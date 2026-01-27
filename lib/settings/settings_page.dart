@@ -23,7 +23,7 @@ class SettingsPage extends StatelessWidget {
                 trailing: Switch(
                   value: true,
                   onChanged: (value) {},
-                  activeColor: AppColor.navy,
+                  activeThumbColor: AppColor.navy,
                 ),
               ),
               const Divider(),
@@ -45,7 +45,7 @@ class SettingsPage extends StatelessWidget {
                   onChanged: (value) {
                     themeProvider.toggleTheme();
                   },
-                  activeColor: AppColor.navy,
+                  activeThumbColor: AppColor.navy,
                 ),
               ),
               const Divider(),
@@ -56,9 +56,11 @@ class SettingsPage extends StatelessWidget {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.info, color: AppColor.navy),
-                title: const Text('À Propos'),
-                onTap: () {},
+                leading: const Icon(Icons.admin_panel_settings, color: AppColor.navy),
+                title: const Text('Admin'),
+                onTap: () {
+                  Navigator.pushNamed(context, '/admin');
+                },
               ),
             ],
           );

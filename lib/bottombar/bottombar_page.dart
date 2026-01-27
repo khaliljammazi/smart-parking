@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/constanst.dart';
 import '../home/home_page.dart';
 import '../parkinglist/parking_list_page.dart';
+import '../vehicle/vehicle_management_page.dart';
 import '../account/account_profile.dart';
 import '../settings/settings_page.dart';
 
@@ -15,11 +16,12 @@ class BottomBarPage extends StatefulWidget {
 class _BottomBarPageState extends State<BottomBarPage> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomePage(),
-    ParkingListPage(),
-    AccountProfile(),
-    SettingsPage(),
+  static final List<Widget> _widgetOptions = <Widget>[
+    const HomePage(),
+    const ParkingListPage(),
+    const VehicleManagementPage(),
+    const AccountProfile(),
+    const SettingsPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -41,6 +43,10 @@ class _BottomBarPageState extends State<BottomBarPage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.local_parking),
             label: 'Parking',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.directions_car),
+            label: 'Véhicules',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

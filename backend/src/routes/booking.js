@@ -27,6 +27,103 @@ const createBookingValidation = [
     .withMessage('Invalid booking type')
 ];
 
+// @route   POST /api/bookings/reserve
+// @desc    Create immediate reservation with QR code
+// @access  Private
+router.post('/reserve', protect, async (req, res) => {
+  try {
+    const { parkingId, vehicleId } = req.body;
+
+    if (!parkingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parking ID is required'
+      });
+    }
+
+    // Check if parking exists and has available spots
+    const parking = await Parking.findById(parkingId);
+    if (!parking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Parking not found'
+      });
+    }
+
+    if (!parking.isActive || !parking.isSpotAvailable()) {
+      return res.status(400).json({
+        success: false,
+        message: 'No available spots at this parking'
+      });
+    }
+
+    // Check if vehicle belongs to user (if vehicleId provided)
+    let vehicle = null;
+    if (vehicleId) {
+      vehicle = await Vehicle.findOne({
+        _id: vehicleId,
+        owner: req.user._id
+      });
+
+      if (!vehicle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vehicle not found or not owned by user'
+        });
+      }
+    }
+
+    // Create booking with immediate start time (set to 1 minute in future to pass validation)
+    const now = new Date();
+    const startTime = new Date(now.getTime() + 60 * 1000); // 1 minute from now
+    const endTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default 24 hours
+
+    const booking = new Booking({
+      user: req.user._id,
+      parking: parkingId,
+      vehicle: vehicleId || null, // Allow null for immediate reservations
+      bookingType: 'hourly',
+      startTime: startTime,
+      endTime: endTime,
+      status: 'confirmed',
+      pricing: {
+        rate: parking.pricing.hourly,
+        subtotal: 0, // Will be calculated at checkout
+        tax: 0,
+        total: 0
+      },
+      payment: {
+        status: 'pending',
+        method: 'cash'
+      }
+    });
+
+    // Save booking (QR code will be generated in pre-save middleware)
+    await booking.save();
+
+    // Update parking availability
+    parking.availableSpots -= 1;
+    await parking.save();
+
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate('parking', 'name address coordinates pricing')
+      .populate('vehicle', 'licensePlate make model');
+
+    res.status(201).json({
+      success: true,
+      message: 'Reservation created successfully',
+      data: { booking: populatedBooking }
+    });
+  } catch (error) {
+    console.error('Reserve parking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create reservation',
+      error: error.message
+    });
+  }
+});
+
 // @route   POST /api/bookings
 // @desc    Create new booking
 // @access  Private
@@ -284,6 +381,82 @@ router.put('/:id/cancel', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Cancel booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   PUT /api/bookings/:id/checkin
+// @desc    Check in to parking spot (requires admin validation)
+// @access  Private
+router.put('/:id/checkin', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      status: 'confirmed'
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found or cannot be checked in'
+      });
+    }
+
+    // Check if booking has been validated by admin
+    if (!booking.adminValidated) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking must be validated by admin before check-in'
+      });
+    }
+
+    await booking.checkIn();
+
+    res.json({
+      success: true,
+      message: 'Checked in successfully',
+      data: { booking }
+    });
+  } catch (error) {
+    console.error('Check-in error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   PUT /api/bookings/:id/checkout
+// @desc    Check out from parking spot
+// @access  Private
+router.put('/:id/checkout', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      status: 'active'
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active booking not found'
+      });
+    }
+
+    await booking.checkOut();
+
+    res.json({
+      success: true,
+      message: 'Checked out successfully',
+      data: { booking }
+    });
+  } catch (error) {
+    console.error('Check-out error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

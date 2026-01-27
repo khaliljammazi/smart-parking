@@ -6,6 +6,7 @@ import '../location/map_page.dart';
 import '../utils/constanst.dart';
 import '../utils/text/regular.dart';
 import '../utils/text/semi_bold.dart';
+import '../utils/backend_api.dart';
 import 'components/nearby_card.dart';
 import 'components/nearby_shim_list.dart';
 import 'components/parking_horizontal_card.dart';
@@ -21,18 +22,21 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String address = 'Tunis, Tunisie';
-  bool isLoadingNearby = false;
-  bool isLoadingFeatured = false;
+  double? lat;
+  double? long;
 
   @override
   void initState() {
     super.initState();
-    // Simulate loading
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        isLoadingNearby = true;
-        isLoadingFeatured = true;
-      });
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    // TODO: Get current location using geolocator
+    // For now, use default Tunis coordinates
+    setState(() {
+      lat = 36.8065;
+      long = 10.1815;
     });
   }
 
@@ -125,31 +129,44 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    isLoadingNearby
-                        ? SizedBox(
-                            height: 340,
-                            child: ListView.builder(
+                    SizedBox(
+                      height: 340,
+                      child: FutureBuilder<List<ParkingModel>>(
+                        future: lat != null && long != null
+                            ? BackendApi.getParkingSpots(lat!, long!, 5000)
+                            : Future.value([]),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const NearByLoadingList();
+                          } else if (snapshot.hasError) {
+                            return const Center(child: Text('Error loading nearby parking'));
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(child: Text('No nearby parking found'));
+                          } else {
+                            return ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.only(left: 12),
                               itemBuilder: (context, index) {
-                                final parking = mockParkingSpots[index % mockParkingSpots.length];
+                                final parking = snapshot.data![index];
                                 return NearByCard(
-                                  id: parking.id,
+                                  id: int.tryParse(parking.id) ?? 0,
                                   title: parking.name,
-                                  imagePath: parking.imageUrl,
+                                  imagePath: parking.imageUrl ?? 'https://via.placeholder.com/300x200',
                                   rating: parking.rating,
-                                  carPrice: parking.carPrice,
-                                  motoPrice: parking.motoPrice,
+                                  carPrice: parking.pricePerHour,
+                                  motoPrice: parking.pricePerHour * 0.6,
                                   address: parking.address,
-                                  isPrepayment: parking.isPrepayment,
-                                  isOvernight: parking.isOvernight,
-                                  distance: parking.distance,
+                                  isPrepayment: true,
+                                  isOvernight: false,
+                                  distance: 1.5,
                                 );
                               },
-                              itemCount: mockParkingSpots.length,
-                            ),
-                          )
-                        : const NearByLoadingList(),
+                              itemCount: snapshot.data!.length,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -173,26 +190,40 @@ class _HomePageState extends State<HomePage> {
                         page: ParkingListPage(),
                       ),
                     ),
-                    isLoadingFeatured
-                        ? ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) {
-                              final parking = mockParkingSpots[(index + 2) % mockParkingSpots.length];
-                              return ParkingCardHome(
-                                title: parking.name,
-                                imagePath: parking.imageUrl,
-                                rating: parking.rating,
-                                motoPrice: parking.motoPrice,
-                                carPrice: parking.carPrice,
-                                address: parking.address,
-                                isFavorite: index % 2 == 0,
-                                id: parking.id,
-                              );
-                            },
-                            itemCount: 4,
-                          )
-                        : const ParkinkCardHomeLoadingList(),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 200,
+                      child: FutureBuilder<List<ParkingModel>>(
+                        future: BackendApi.getAllParkingSpots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const ParkinkCardHomeLoadingList();
+                          } else if (snapshot.hasError) {
+                            return const Center(child: Text('Error loading featured parking'));
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(child: Text('No featured parking found'));
+                          } else {
+                            return ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemBuilder: (context, index) {
+                                final parking = snapshot.data![index];
+                                return ParkingCardHome(
+                                  title: parking.name,
+                                  imagePath: parking.imageUrl ?? 'https://via.placeholder.com/300x200',
+                                  rating: parking.rating,
+                                  motoPrice: parking.pricePerHour * 0.6,
+                                  carPrice: parking.pricePerHour,
+                                  address: parking.address,
+                                  isFavorite: index % 2 == 0,
+                                  id: int.tryParse(parking.id) ?? 0,
+                                );
+                              },
+                              itemCount: snapshot.data!.length > 4 ? 4 : snapshot.data!.length,
+                            );
+                          }
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -206,16 +237,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refreshData() async {
     setState(() {
-      isLoadingNearby = false;
-      isLoadingFeatured = false;
-    });
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      isLoadingNearby = true;
-      isLoadingFeatured = true;
+      // Trigger rebuild to refresh FutureBuilders
     });
   }
 }

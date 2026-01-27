@@ -32,6 +32,50 @@ class ParkingSpot {
   });
 }
 
+class ParkingModel {
+  final String id;
+  final String name;
+  final String address;
+  final double latitude;
+  final double longitude;
+  final double pricePerHour;
+  final int totalSpots;
+  final int availableSpots;
+  final double rating;
+  final String? imageUrl;
+  final bool isOpen;
+
+  ParkingModel({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.pricePerHour,
+    required this.totalSpots,
+    required this.availableSpots,
+    required this.rating,
+    this.imageUrl,
+    required this.isOpen,
+  });
+
+  factory ParkingModel.fromJson(Map<String, dynamic> json) {
+    return ParkingModel(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      address: json['address'] ?? '',
+      latitude: json['latitude'] ?? 0.0,
+      longitude: json['longitude'] ?? 0.0,
+      pricePerHour: json['pricePerHour'] ?? 0.0,
+      totalSpots: json['totalSpots'] ?? 0,
+      availableSpots: json['availableSpots'] ?? 0,
+      rating: json['rating'] ?? 0.0,
+      imageUrl: json['imageUrl'],
+      isOpen: json['isOpen'] ?? true,
+    );
+  }
+}
+
 // Mock data
 List<ParkingSpot> mockParkingSpots = [
   ParkingSpot(

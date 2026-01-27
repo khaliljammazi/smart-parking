@@ -129,7 +129,6 @@ const vehicleSchema = new mongoose.Schema({
 
 // Indexes
 vehicleSchema.index({ owner: 1 });
-vehicleSchema.index({ licensePlate: 1 }, { unique: true });
 vehicleSchema.index({ isDefault: 1 });
 
 // Virtual for full vehicle name

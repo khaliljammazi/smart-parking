@@ -1,23 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key});
+  final Function(double lat, double lng)? onLocationSelected;
+
+  const MapPage({super.key, this.onLocationSelected});
 
   @override
   State<MapPage> createState() => _MapPageState();
 }
 
 class _MapPageState extends State<MapPage> {
-  final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
-  final Set<Marker> _markers = <Marker>{};
-  final Set<Circle> _circles = <Circle>{};
-  bool _hasError = false;
-  String _errorMessage = '';
+  final MapController _mapController = MapController();
+  final List<Marker> _markers = [];
+  final List<CircleMarker> _circles = [];
 
   // GPS related variables
   Position? _currentPosition;
@@ -25,10 +26,10 @@ class _MapPageState extends State<MapPage> {
   bool _locationPermissionGranted = false;
   StreamSubscription<Position>? _positionStream;
 
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(36.8065, 10.1815), // Tunis coordinates
-    zoom: 12.0,
-  );
+  LatLng? _selectedLocation;
+
+  static const LatLng _initialCenter = LatLng(36.8065, 10.1815); // Tunis coordinates
+  static const double _initialZoom = 12.0;
 
   @override
   void initState() {
@@ -41,35 +42,37 @@ class _MapPageState extends State<MapPage> {
   @override
   void dispose() {
     _positionStream?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
   void _addParkingMarkers() {
     for (final parking in mockParkingSpots) {
       final marker = Marker(
-        markerId: MarkerId(parking.id.toString()),
-        position: LatLng(parking.latitude, parking.longitude),
-        infoWindow: InfoWindow(
-          title: parking.name,
-          snippet: '${parking.pricePerHour} DT/h • ${parking.availableSpots} places',
+        width: 40,
+        height: 40,
+        point: LatLng(parking.latitude, parking.longitude),
+        child: GestureDetector(
+          onTap: () => _showParkingDetails(parking),
+          child: const Icon(
+            Icons.location_on,
+            color: Colors.blue,
+            size: 40,
+          ),
         ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        onTap: () {
-          _showParkingDetails(parking);
-        },
       );
       _markers.add(marker);
     }
   }
 
   void _addSearchRadius() {
-    const circle = Circle(
-      circleId: CircleId('search_radius'),
-      center: LatLng(36.8065, 10.1815),
-      radius: 2000, // 2km radius
-      fillColor: Color(0x1A2196F3), // Blue with 10% opacity
-      strokeColor: Colors.blue,
-      strokeWidth: 2,
+    final circle = CircleMarker(
+      point: _initialCenter,
+      radius: 2000, // 2km radius in meters
+      useRadiusInMeter: true,
+      color: const Color(0x1A2196F3), // Blue with 10% opacity
+      borderColor: Colors.blue,
+      borderStrokeWidth: 2,
     );
     _circles.add(circle);
   }
@@ -146,6 +149,31 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
+  void _onMapTap(TapPosition tapPosition, LatLng point) {
+    setState(() {
+      _selectedLocation = point;
+    });
+  }
+
+  List<Marker> _getAllMarkers() {
+    final markers = List<Marker>.from(_markers);
+    if (_selectedLocation != null) {
+      markers.add(
+        Marker(
+          width: 40,
+          height: 40,
+          point: _selectedLocation!,
+          child: const Icon(
+            Icons.location_pin,
+            color: Colors.red,
+            size: 40,
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLocationLoading = true;
@@ -187,104 +215,102 @@ class _MapPageState extends State<MapPage> {
     _positionStream = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((Position position) {
-      setState(() {
-        _currentPosition = position;
-      });
-      _updateUserLocationMarker();
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+        _updateUserLocationMarker();
+      }
     });
   }
 
   void _addUserLocationMarker() {
     if (_currentPosition != null) {
       final userMarker = Marker(
-        markerId: const MarkerId('user_location'),
-        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        infoWindow: const InfoWindow(title: 'Votre position'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        width: 50,
+        height: 50,
+        point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.person,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
       );
 
-      setState(() {
-        _markers.add(userMarker);
-      });
+      if (mounted) {
+        setState(() {
+          _markers.add(userMarker);
+        });
+      }
     }
   }
 
   void _updateUserLocationMarker() {
-    if (_currentPosition != null) {
+    if (_currentPosition != null && mounted) {
       final userMarker = Marker(
-        markerId: const MarkerId('user_location'),
-        position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        infoWindow: const InfoWindow(title: 'Votre position'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        width: 50,
+        height: 50,
+        point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.person,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
       );
 
       setState(() {
-        _markers.removeWhere((marker) => marker.markerId.value == 'user_location');
+        // Remove old user location markers
+        _markers.removeWhere((marker) => 
+          marker.child is Container && 
+          (marker.child as Container).decoration is BoxDecoration &&
+          ((marker.child as Container).decoration as BoxDecoration).color == Colors.green
+        );
         _markers.add(userMarker);
       });
     }
   }
 
-  Future<void> _goToUserLocation() async {
+  void _goToUserLocation() {
     if (_currentPosition != null) {
-      final GoogleMapController controller = await _controller.future;
-      final userLocation = CameraPosition(
-        target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        zoom: 16.0,
+      _mapController.move(
+        LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        16.0,
       );
-      await controller.animateCamera(CameraUpdate.newCameraPosition(userLocation));
     } else {
-      // If no current position, try to get it
-      await _getCurrentLocation();
+      _getCurrentLocation();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_hasError) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Carte des Parkings'),
-          backgroundColor: AppColor.navy,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text(
-                'Erreur de chargement de la carte',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Vérifiez que la facturation est activée sur votre projet Google Cloud.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.navy,
-                ),
-                child: const Text('Retour'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Carte des Parkings'),
@@ -322,7 +348,6 @@ class _MapPageState extends State<MapPage> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Implement search functionality
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Fonction de recherche à venir')),
               );
@@ -330,38 +355,63 @@ class _MapPageState extends State<MapPage> {
           ),
         ],
       ),
-      body: GoogleMap(
-        mapType: MapType.normal,
-        initialCameraPosition: _initialPosition,
-        markers: _markers,
-        circles: _circles,
-        onMapCreated: (GoogleMapController controller) {
-          _controller.complete(controller);
-        },
-        myLocationEnabled: true,
-        myLocationButtonEnabled: false, // We have our own button
-        zoomControlsEnabled: true,
-        compassEnabled: true,
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _initialCenter,
+          initialZoom: _initialZoom,
+          minZoom: 5,
+          maxZoom: 18,
+          onTap: widget.onLocationSelected != null ? _onMapTap : null,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.smartparking.app',
+            maxZoom: 19,
+          ),
+          CircleLayer(
+            circles: _circles,
+          ),
+          MarkerLayer(
+            markers: _getAllMarkers(),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _goToCurrentLocation,
-        backgroundColor: AppColor.navy,
-        child: const Icon(Icons.my_location),
-      ),
+      floatingActionButton: widget.onLocationSelected != null
+          ? FloatingActionButton.extended(
+              onPressed: _selectedLocation != null
+                  ? () {
+                      widget.onLocationSelected!(_selectedLocation!.latitude, _selectedLocation!.longitude);
+                      Navigator.of(context).pop();
+                    }
+                  : null,
+              backgroundColor: AppColor.navy,
+              icon: const Icon(Icons.check),
+              label: const Text('Confirmer Emplacement'),
+            )
+          : FloatingActionButton(
+              onPressed: _goToCurrentLocation,
+              backgroundColor: AppColor.navy,
+              child: const Icon(Icons.my_location),
+            ),
     );
   }
 
-  Future<void> _goToCurrentLocation() async {
+  void _goToCurrentLocation() {
     if (!_locationPermissionGranted) {
-      await _checkLocationPermission();
-      if (!_locationPermissionGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permission de localisation requise')),
-        );
-        return;
-      }
+      _checkLocationPermission().then((_) {
+        if (_locationPermissionGranted) {
+          _getCurrentLocation();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permission de localisation requise')),
+          );
+        }
+      });
+      return;
     }
 
-    await _goToUserLocation();
+    _goToUserLocation();
   }
 }

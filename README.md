@@ -54,3 +54,5 @@ To use Google Maps functionality, you need to configure a Google Maps API key:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+flutter run -d chrome --web-port=51919

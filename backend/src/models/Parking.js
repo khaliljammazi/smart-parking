@@ -180,7 +180,6 @@ parkingSchema.index({ 'coordinates': '2dsphere' });
 parkingSchema.index({ 'address.city': 1 });
 parkingSchema.index({ isActive: 1 });
 parkingSchema.index({ owner: 1 });
-parkingSchema.index({ qrCode: 1 });
 
 // Virtual for full address
 parkingSchema.virtual('fullAddress').get(function() {

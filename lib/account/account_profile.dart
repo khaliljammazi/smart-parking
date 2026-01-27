@@ -3,7 +3,7 @@ import '../utils/constanst.dart';
 import 'component/profile_body.dart';
 
 class AccountProfile extends StatelessWidget {
-  const AccountProfile({Key? key}) : super(key: key);
+  const AccountProfile({super.key});
 
   @override
   Widget build(BuildContext context) {

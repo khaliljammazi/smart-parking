@@ -13,6 +13,8 @@ const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/user');
 const parkingRoutes = require('./src/routes/parking');
 const bookingRoutes = require('./src/routes/booking');
+const vehicleRoutes = require('./src/routes/vehicle');
+const adminRoutes = require('./src/routes/admin');
 const qrRoutes = require('./src/routes/qr');
 
 // Middleware
@@ -42,6 +44,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parking', parkingRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/qr', qrRoutes);
 
 // Health check
@@ -73,7 +77,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart_par
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

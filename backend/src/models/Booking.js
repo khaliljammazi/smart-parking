@@ -16,8 +16,8 @@ const bookingSchema = new mongoose.Schema({
 
   vehicle: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vehicle',
-    required: [true, 'Booking must have a vehicle']
+    ref: 'Vehicle'
+    // Made optional for immediate reservations
   },
 
   // Booking Details
@@ -32,6 +32,11 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'Start time is required'],
     validate: {
       validator: function(value) {
+        // Skip validation if booking is being checked in (has checkInTime), checked out (has checkOutTime),
+        // or is already active/completed
+        if (this.checkInTime || this.checkOutTime || this.status === 'active' || this.status === 'completed') {
+          return true;
+        }
         return value > new Date();
       },
       message: 'Start time must be in the future'
@@ -103,6 +108,21 @@ const bookingSchema = new mongoose.Schema({
 
   qrCodeExpires: {
     type: Date
+  },
+
+  // Admin validation
+  adminValidated: {
+    type: Boolean,
+    default: false
+  },
+
+  adminValidatedAt: {
+    type: Date
+  },
+
+  adminValidatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
 
   // Payment (happens at exit)
@@ -177,7 +197,6 @@ const bookingSchema = new mongoose.Schema({
 // Indexes
 bookingSchema.index({ user: 1, status: 1 });
 bookingSchema.index({ parking: 1, startTime: 1, endTime: 1 });
-bookingSchema.index({ qrCode: 1 }, { sparse: true });
 bookingSchema.index({ startTime: 1, endTime: 1 });
 bookingSchema.index({ status: 1, startTime: 1 });
 
@@ -253,9 +272,13 @@ bookingSchema.methods.checkIn = function() {
   return this.save();
 };
 
-bookingSchema.methods.checkOut = function() {
+bookingSchema.methods.checkOut = async function() {
   this.checkOutTime = new Date();
   this.status = 'completed';
+
+  // Calculate final pricing
+  await this.calculatePricing();
+
   return this.save();
 };
 
@@ -270,5 +293,41 @@ bookingSchema.methods.addRating = function(rating) {
   this.rating = { ...this.rating, ...rating };
   return this.save();
 };
+
+// Calculate pricing based on actual usage time
+bookingSchema.methods.calculatePricing = async function() {
+  const parking = await mongoose.model('Parking').findById(this.parking);
+  if (!parking) return;
+
+  const checkOutTime = this.checkOutTime || new Date();
+  const actualStartTime = this.checkInTime || this.startTime;
+  let hoursUsed = Math.ceil((checkOutTime - actualStartTime) / (1000 * 60 * 60));
+
+  // Minimum 1 hour, add 2 extra hours if still parked
+  if (this.status === 'active' && !this.checkOutTime) {
+    hoursUsed += 2; // Add 2 extra hours for cars still parked
+  }
+
+  hoursUsed = Math.max(1, hoursUsed); // Minimum 1 hour
+
+  const hourlyRate = parking.pricing.hourly || 1; // Default 1 DT per hour
+  const subtotal = hoursUsed * hourlyRate;
+  const tax = subtotal * 0.19; // 19% tax
+  const total = subtotal + tax;
+
+  this.pricing = {
+    rate: hourlyRate,
+    subtotal: Math.round(subtotal * 100) / 100,
+    tax: Math.round(tax * 100) / 100,
+    total: Math.round(total * 100) / 100
+  };
+
+  this.duration = { hours: hoursUsed };
+
+  return this.save();
+};
+
+// Add pagination plugin
+bookingSchema.plugin(require('mongoose-paginate-v2'));
 
 module.exports = mongoose.model('Booking', bookingSchema);

@@ -82,29 +82,85 @@ router.get('/', async (req, res) => {
       if (maxPrice) query['pricing.hourly'].$lte = parseFloat(maxPrice);
     }
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { 'rating.average': -1, createdAt: -1 },
-      select: 'name address coordinates pricing availableSpots features rating images'
-    };
+    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page);
+    const skip = (pageNum - 1) * limitNum;
 
-    const result = await Parking.paginate(query, options);
+    // Create separate query for counting (without geospatial operators that require sorting)
+    let countQuery = { isActive: true };
+
+    // Location-based search for count (use $geoWithin instead of $near)
+    if (latitude && longitude) {
+      countQuery = {
+        ...countQuery,
+        coordinates: {
+          $geoWithin: {
+            $centerSphere: [[parseFloat(longitude), parseFloat(latitude)], parseInt(radius) / 6371000] // radius in radians
+          }
+        }
+      };
+    }
+
+    // Apply other filters to count query
+    if (available === 'true') {
+      countQuery.availableSpots = { $gt: 0 };
+    }
+    if (features) {
+      const featureArray = features.split(',');
+      countQuery.features = { $in: featureArray };
+    }
+    if (minPrice || maxPrice) {
+      countQuery['pricing.hourly'] = {};
+      if (minPrice) countQuery['pricing.hourly'].$gte = parseFloat(minPrice);
+      if (maxPrice) countQuery['pricing.hourly'].$lte = parseFloat(maxPrice);
+    }
+
+    const total = await Parking.countDocuments(countQuery);
+    let parkingsQuery = Parking.find(query)
+      .select('name address coordinates pricing availableSpots totalSpots features rating images isActive');
+
+    // Only apply sorting if not using geospatial query ($near automatically sorts by distance)
+    if (!(latitude && longitude)) {
+      parkingsQuery = parkingsQuery.sort({ 'rating.average': -1, createdAt: -1 });
+    }
+
+    const parkings = await parkingsQuery
+      .skip(skip)
+      .limit(limitNum);
 
     res.json({
       success: true,
       data: {
-        parkings: result.docs,
+        parkings,
         pagination: {
-          page: result.page,
-          pages: result.totalPages,
-          total: result.totalDocs,
-          limit: result.limit
+          page: pageNum,
+          pages: Math.ceil(total / limitNum),
+          total: total,
+          limit: limitNum
         }
       }
     });
   } catch (error) {
     console.error('Get parkings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/parking/all
+// @desc    Get all parking spots
+// @access  Private
+router.get('/all', protect, async (req, res) => {
+  try {
+    const parkings = await Parking.find({ isActive: true })
+      .select('name address location pricePerHour allowsOvernight rating image')
+      .sort({ 'rating': -1 });
+
+    res.json(parkings);
+  } catch (error) {
+    console.error('Get all parkings error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

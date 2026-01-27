@@ -39,7 +39,7 @@ class WalletPage extends StatelessWidget {
                         fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Text(
                       '150.00 DT',
                       style: TextStyle(
