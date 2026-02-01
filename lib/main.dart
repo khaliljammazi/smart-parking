@@ -3,12 +3,16 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'introduction/splash_page.dart';
 import 'utils/theme_provider.dart';
+import 'utils/route_guard.dart';
 import 'authentication/auth_provider.dart';
 import 'authentication/login_page.dart';
+import 'authentication/forgot_password_page.dart';
 import 'authentication/phone_number_dialog.dart';
 import 'authentication/vehicle_required_dialog.dart';
 import 'bottombar/bottombar_page.dart';
 import 'admin/admin_dashboard_page.dart';
+import 'account/settings_page.dart';
+import 'notification/notification_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,7 +85,10 @@ class _MyAppState extends State<MyApp> {
           routes: {
             '/login': (context) => const LoginPage(),
             '/home': (context) => const BottomBarPage(),
-            '/admin': (context) => const AdminDashboardPage(),
+            '/admin': (context) => const AdminRouteGuard(child: AdminDashboardPage()),
+            '/forgot-password': (context) => const ForgotPasswordPage(),
+            '/settings': (context) => const SettingsPage(),
+            '/notifications': (context) => const NotificationPage(),
           },
         );
       },

@@ -1,10 +1,29 @@
 const express = require('express');
 const passport = require('passport');
 const { body, validationResult } = require('express-validator');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+// In-memory OTP store (for demo; use Redis or DB in production)
+const otpStore = new Map(); // key: email, value: { otp: string, expires: Date }
+
+// Configure nodemailer with Gmail
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  },
+});
+
+// Helper to generate OTP
+function generateOTP() {
+  return crypto.randomInt(100000, 999999).toString();
+}
 
 // Validation rules
 const registerValidation = [
@@ -178,6 +197,60 @@ router.post('/login', loginValidation, async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/add-phone-and-send-otp
+// @desc    Add phone and send OTP for Google users
+// @access  Public
+router.post('/add-phone-and-send-otp', async (req, res) => {
+  const { userId, phone } = req.body;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.phone = phone;
+    await user.save();
+
+    // Generate and store OTP
+    const otp = generateOTP();
+    const expires = new Date(Date.now() + 5 * 60 * 1000);
+    otpStore.set(user.email, { otp, expires });
+
+    // Send OTP to email
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: user.email,
+      subject: 'Verify Your Phone Number - OTP',
+      text: `Your OTP to verify phone number is: ${otp}. It expires in 5 minutes.`,
+    });
+
+    res.json({ success: true, message: 'OTP sent to your email' });
+  } catch (error) {
+    console.error('Add phone and send OTP error:', error);
+    res.status(500).json({ success: false, message: 'Error adding phone or sending OTP' });
+  }
+});
+
+// @route   POST /api/auth/verify-phone-otp
+// @desc    Verify phone OTP
+// @access  Public
+router.post('/verify-phone-otp', async (req, res) => {
+  const { userId, otp } = req.body;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const stored = otpStore.get(user.email);
+    if (!stored || stored.otp !== otp || new Date() > stored.expires) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    otpStore.delete(user.email);
+    res.json({ success: true, message: 'Phone verified successfully' });
+  } catch (error) {
+    console.error('Verify phone OTP error:', error);
+    res.status(500).json({ success: false, message: 'OTP verification failed' });
+  }
+});
+
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
@@ -236,32 +309,6 @@ router.get('/google/callback',
       res.redirect(redirectUrl);
     } catch (error) {
       console.error('Google OAuth callback error:', error);
-      res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
-    }
-  }
-);
-
-// Facebook OAuth routes
-router.get('/facebook',
-  passport.authenticate('facebook', { scope: ['email'], session: false })
-);
-
-router.get('/facebook/callback',
-  passport.authenticate('facebook', { failureRedirect: '/login', session: false }),
-  async (req, res) => {
-    try {
-      const token = req.user.generateAuthToken();
-
-      // Update login info
-      req.user.lastLogin = new Date();
-      req.user.loginCount += 1;
-      await req.user.save();
-
-      // Redirect to frontend with token
-      const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?token=${token}&provider=facebook`;
-      res.redirect(redirectUrl);
-    } catch (error) {
-      console.error('Facebook OAuth callback error:', error);
       res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
     }
   }

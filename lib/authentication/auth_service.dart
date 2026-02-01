@@ -54,13 +54,56 @@ class AuthService {
     }
   }
 
+  // Remember me functionality
+  static Future<void> saveEmail(String email) async {
+    await _initPrefs();
+    if (kIsWeb) {
+      await _prefs.setString('saved_email', email);
+    } else {
+      await _storage.write(key: 'saved_email', value: email);
+    }
+  }
+
+  static Future<String?> getSavedEmail() async {
+    await _initPrefs();
+    if (kIsWeb) {
+      return _prefs.getString('saved_email');
+    } else {
+      return await _storage.read(key: 'saved_email');
+    }
+  }
+
+  static Future<void> clearSavedEmail() async {
+    await _initPrefs();
+    if (kIsWeb) {
+      await _prefs.remove('saved_email');
+    } else {
+      await _storage.delete(key: 'saved_email');
+    }
+  }
+
+  static Future<void> setRememberMePreference(bool value) async {
+    await _initPrefs();
+    if (kIsWeb) {
+      await _prefs.setBool('remember_me', value);
+    } else {
+      await _storage.write(key: 'remember_me', value: value.toString());
+    }
+  }
+
+  static Future<bool> getRememberMePreference() async {
+    await _initPrefs();
+    if (kIsWeb) {
+      return _prefs.getBool('remember_me') ?? false;
+    } else {
+      final value = await _storage.read(key: 'remember_me');
+      return value == 'true';
+    }
+  }
+
   // OAuth URLs
   static String getGoogleAuthUrl() {
     return '$baseUrl/auth/google';
-  }
-
-  static String getFacebookAuthUrl() {
-    return '$baseUrl/auth/facebook';
   }
 
   // Handle OAuth callback
@@ -131,6 +174,76 @@ class AuthService {
     } catch (e) {
       print('Error updating user profile: $e');
       return false;
+    }
+  }
+
+  // Login with email and password
+  static Future<Map<String, dynamic>?> loginWithEmail(String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error logging in: $e');
+      return null;
+    }
+  }
+
+  // Request password reset OTP
+  static Future<Map<String, dynamic>?> forgotPassword(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+        }),
+      );
+
+      return json.decode(response.body);
+    } catch (e) {
+      print('Error requesting password reset: $e');
+      return {'success': false, 'message': 'Network error. Please try again.'};
+    }
+  }
+
+  // Reset password with OTP
+  static Future<Map<String, dynamic>?> resetPassword(
+    String email,
+    String otp,
+    String newPassword,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/reset-password'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+          'otp': otp,
+          'newPassword': newPassword,
+        }),
+      );
+
+      return json.decode(response.body);
+    } catch (e) {
+      print('Error resetting password: $e');
+      return {'success': false, 'message': 'Network error. Please try again.'};
     }
   }
 }

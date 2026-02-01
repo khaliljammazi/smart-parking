@@ -131,6 +131,66 @@ async function seedDatabase() {
       console.log('Using existing demo owner user');
     }
 
+    // Find or create a super admin user
+    let superAdmin = await User.findOne({ email: 'superadmin@smartparking.com' });
+    if (!superAdmin) {
+      superAdmin = await User.create({
+        firstName: 'Super',
+        lastName: 'Admin',
+        email: 'superadmin@smartparking.com',
+        password: 'super123456',
+        phone: '+1234567890',
+        role: 'super_admin',
+        isVerified: true
+      });
+      console.log('Created super admin user');
+      console.log('Super Admin credentials:');
+      console.log('Email: superadmin@smartparking.com');
+      console.log('Password: super123456');
+    } else {
+      console.log('Using existing super admin user');
+    }
+
+    // Find or create an admin user
+    let admin = await User.findOne({ email: 'admin@smartparking.com' });
+    if (!admin) {
+      admin = await User.create({
+        firstName: 'Admin',
+        lastName: 'User',
+        email: 'admin@smartparking.com',
+        password: 'admin123456',
+        phone: '+1234567891',
+        role: 'admin',
+        isVerified: true
+      });
+      console.log('Created admin user');
+      console.log('Admin credentials:');
+      console.log('Email: admin@smartparking.com');
+      console.log('Password: admin123456');
+    } else {
+      console.log('Using existing admin user');
+    }
+
+    // Find or create a parking operator user
+    let operator = await User.findOne({ email: 'operator@smartparking.com' });
+    if (!operator) {
+      operator = await User.create({
+        firstName: 'Parking',
+        lastName: 'Operator',
+        email: 'operator@smartparking.com',
+        password: 'operator123456',
+        phone: '+1234567892',
+        role: 'parking_operator',
+        isVerified: true
+      });
+      console.log('Created parking operator user');
+      console.log('Parking Operator credentials:');
+      console.log('Email: operator@smartparking.com');
+      console.log('Password: operator123456');
+    } else {
+      console.log('Using existing parking operator user');
+    }
+
     // Clear existing parking data
     await Parking.deleteMany({});
     console.log('Cleared existing parking data');

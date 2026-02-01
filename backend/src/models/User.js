@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: function() {
-      return !this.googleId && !this.facebookId; // Phone required for email signup only
+      return !this.googleId; // Phone required for email signup only
     },
     validate: {
       validator: function(phone) {
@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      return !this.googleId && !this.facebookId; // Password required for email signup
+      return !this.googleId; // Password required for email signup
     },
     minlength: [6, 'Password must be at least 6 characters'],
     select: false // Don't include password in queries by default
@@ -52,10 +52,6 @@ const userSchema = new mongoose.Schema({
 
   // OAuth 2.0
   googleId: {
-    type: String,
-    sparse: true
-  },
-  facebookId: {
     type: String,
     sparse: true
   },
@@ -122,7 +118,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
+    enum: ['user', 'parking_operator', 'admin', 'super_admin'],
     default: 'user'
   },
   emailVerificationToken: String,
@@ -189,10 +185,9 @@ userSchema.methods.generateAuthToken = function() {
 };
 
 // Static method to find user by email or OAuth ID
-userSchema.statics.findByEmailOrOAuth = function(email, googleId = null, facebookId = null) {
+userSchema.statics.findByEmailOrOAuth = function(email, googleId = null) {
   const query = { $or: [{ email }] };
   if (googleId) query.$or.push({ googleId });
-  if (facebookId) query.$or.push({ facebookId });
   return this.findOne(query);
 };
 

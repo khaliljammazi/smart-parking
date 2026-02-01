@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
 import '../booking/booking_service.dart';
 import '../utils/backend_api.dart';
 import '../utils/constanst.dart';
+import '../utils/role_helper.dart';
 import '../model/parking_model.dart';
+import '../authentication/auth_provider.dart';
 import 'parking_form_page.dart';
 
 class AdminQRScanPage extends StatefulWidget {
@@ -16,6 +19,7 @@ class AdminQRScanPage extends StatefulWidget {
 class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProviderStateMixin {
   bool _isProcessing = false;
   late TabController _tabController;
+  String? _userRole;
 
   // Dashboard data
   int _totalSpots = 0;
@@ -28,6 +32,17 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    // Get user role to determine tab count
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final role = authProvider.userProfile?['role'];
+      setState(() {
+        _userRole = role;
+        // Operators only see Scanner tab, Full admins see both
+        final tabCount = RoleHelper.isFullAdmin(role) ? 2 : 1;
+        _tabController = TabController(length: tabCount, vsync: this);
+      });
+    });
     _tabController = TabController(length: 2, vsync: this);
     _loadDashboardData();
   }
@@ -160,25 +175,31 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final isFullAdmin = RoleHelper.isFullAdmin(_userRole);
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Panel'),
+        title: Text(isFullAdmin ? 'Admin Panel' : 'QR Scanner'),
         backgroundColor: AppColor.navy,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Dashboard'),
-            Tab(text: 'Scanner'),
-          ],
-        ),
+        bottom: isFullAdmin 
+          ? TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Dashboard'),
+                Tab(text: 'Scanner'),
+              ],
+            )
+          : null,
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDashboard(),
-          _buildScanner(),
-        ],
-      ),
+      body: isFullAdmin 
+        ? TabBarView(
+            controller: _tabController,
+            children: [
+              _buildDashboard(),
+              _buildScanner(),
+            ],
+          )
+        : _buildScanner(), // Operators only see scanner
     );
   }
 

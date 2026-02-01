@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../authentication/auth_provider.dart';
 import '../utils/constanst.dart';
+import '../utils/role_helper.dart';
 import 'admin_service.dart';
+import 'manage_users_page.dart';
+import 'manage_admins_page.dart';
+import 'admin_qr_scan_page.dart';
+import '../parkinglist/parking_list_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -39,9 +44,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading dashboard: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading dashboard: $e')));
       }
     }
   }
@@ -51,20 +56,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.userProfile;
 
-    if (user?['role'] != 'admin') {
-      return Scaffold(
-        body: const Center(
-          child: Text('Access denied. Admin privileges required.'),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: AppColor.navy,
         elevation: 0,
-        title: const Text('Admin Dashboard', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(color: Colors.white),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
@@ -81,6 +81,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Quick Actions
+                    const Text(
+                      'Quick Actions',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColor.navy,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildQuickActions(user?['role']),
+                    const SizedBox(height: 32),
+
                     // Statistics Cards
                     if (_dashboardData != null) ...[
                       const Text(
@@ -115,6 +128,109 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildQuickActions(String? userRole) {
+    final isSuperAdmin = RoleHelper.isSuperAdmin(userRole);
+    final isFullAdmin = RoleHelper.isFullAdmin(userRole);
+    final canScanQR = RoleHelper.canScanQR(userRole);
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.5,
+      children: [
+        // QR Scanner - Only for operators and admins who can scan
+        if (canScanQR)
+          _buildActionCard(
+            'Scan QR Code',
+            Icons.qr_code_scanner,
+            Colors.teal,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminQRScanPage()),
+            ),
+          ),
+        // Manage Users - Only for full admins (not operators)
+        if (isFullAdmin)
+          _buildActionCard(
+            'Manage Users',
+            Icons.people,
+            Colors.blue,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ManageUsersPage()),
+            ),
+          ),
+        // Manage Parkings - Only for full admins
+        if (isFullAdmin)
+          _buildActionCard(
+            'Manage Parkings',
+            Icons.local_parking,
+            Colors.green,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ParkingListPage()),
+            ),
+          ),
+        // Manage Admins - Only for super admins
+        if (isSuperAdmin)
+          _buildActionCard(
+            'Manage Admins',
+            Icons.admin_panel_settings,
+            Colors.purple,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ManageAdminsPage()),
+            ),
+          ),
+        // View Reports - Only for full admins
+        if (isFullAdmin)
+          _buildActionCard('View Reports', Icons.analytics, Colors.orange, () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Reports feature coming soon')),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: color),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -154,7 +270,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -256,7 +377,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildRevenueItem(String label, String value, IconData icon, Color color) {
+  Widget _buildRevenueItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -278,10 +404,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color.withOpacity(0.8),
-            ),
+            style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
             textAlign: TextAlign.center,
           ),
         ],

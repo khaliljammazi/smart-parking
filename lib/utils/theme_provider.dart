@@ -30,38 +30,115 @@ class ThemeProvider extends ChangeNotifier {
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF064789),
         brightness: Brightness.light,
+        primary: const Color(0xFF064789),
+        secondary: const Color(0xFFF77F00),
       ),
       useMaterial3: true,
-      scaffoldBackgroundColor: Colors.white,
+      scaffoldBackgroundColor: const Color(0xFFF5F7FA),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF064789),
         foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       cardColor: Colors.white,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF064789),
+          foregroundColor: Colors.white,
+          elevation: 2,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF064789), width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Colors.black),
-        bodyMedium: TextStyle(color: Colors.black87),
+        displayLarge: TextStyle(color: Color(0xFF032445), fontWeight: FontWeight.bold, fontSize: 32),
+        headlineMedium: TextStyle(color: Color(0xFF032445), fontWeight: FontWeight.w600, fontSize: 24),
+        titleLarge: TextStyle(color: Color(0xFF032445), fontWeight: FontWeight.w500, fontSize: 20),
+        bodyLarge: TextStyle(color: Colors.black87, fontSize: 16),
+        bodyMedium: TextStyle(color: Colors.black87, fontSize: 14),
+        labelLarge: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
       ),
     );
   }
 
   ThemeData get darkTheme {
     return ThemeData(
-      primaryColor: const Color(0xFF064789),
+      primaryColor: const Color(0xFF1E88E5),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF064789),
+        seedColor: const Color(0xFF1E88E5),
         brightness: Brightness.dark,
+        primary: const Color(0xFF1E88E5),
+        secondary: const Color(0xFFFF9800),
+        surface: const Color(0xFF1A1F3A),
+        background: const Color(0xFF0A0E27),
+        error: const Color(0xFFCF6679),
       ),
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFF121212),
+      scaffoldBackgroundColor: const Color(0xFF0A0E27),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF064789),
+        backgroundColor: Color(0xFF1A1F3A),
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      cardColor: const Color(0xFF1E1E1E),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1A1F3A),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      cardColor: const Color(0xFF1A1F3A),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1E88E5),
+          foregroundColor: Colors.white,
+          elevation: 2,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF252B48),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Colors.white),
-        bodyMedium: TextStyle(color: Colors.white70),
+        displayLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+        headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 24),
+        titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 20),
+        bodyLarge: TextStyle(color: Colors.white, fontSize: 16),
+        bodyMedium: TextStyle(color: Colors.white70, fontSize: 14),
+        labelLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
       ),
     );
   }

@@ -6,12 +6,23 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Middleware to check if user is admin
+// Middleware to check if user is admin or super_admin
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
     return res.status(403).json({
       success: false,
       message: 'Access denied. Admin role required.'
+    });
+  }
+  next();
+};
+
+// Middleware to check if user is super_admin
+const requireSuperAdmin = (req, res, next) => {
+  if (req.user.role !== 'super_admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Super admin role required.'
     });
   }
   next();
@@ -207,6 +218,290 @@ router.get('/dashboard', protect, requireAdmin, async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   GET /api/admin/users
+// @desc    Get all users with pagination
+// @access  Private (Admin only)
+router.get('/users', protect, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, role, search } = req.query;
+    const query = {};
+
+    if (role) query.role = role;
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await User.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: {
+        users,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page,
+        totalUsers: count
+      }
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/users/:id
+// @desc    Delete a user
+// @access  Private (Admin only)
+router.delete('/users/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting super_admin or admin unless requester is super_admin
+    if ((user.role === 'super_admin' || user.role === 'admin') && req.user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Cannot delete admin users' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/role
+// @desc    Update user role
+// @access  Private (Super Admin only)
+router.put('/users/:id/role', protect, requireSuperAdmin, async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    // Validate role
+    const validRoles = ['user', 'parking_operator', 'admin', 'super_admin'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid role. Must be one of: user, parking_operator, admin, super_admin' 
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent changing super_admin role unless requester is super_admin
+    if (user.role === 'super_admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Cannot modify super admin role' });
+    }
+
+    // Update user role
+    user.role = role;
+    await user.save();
+
+    res.json({ 
+      success: true, 
+      message: 'User role updated successfully',
+      data: {
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/admin/parkings
+// @desc    Create a new parking spot
+// @access  Private (Admin only)
+router.post('/parkings', protect, requireAdmin, async (req, res) => {
+  try {
+    const parking = new Parking({
+      ...req.body,
+      owner: req.user._id
+    });
+
+    await parking.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Parking created successfully',
+      data: parking
+    });
+  } catch (error) {
+    console.error('Create parking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/parkings/:id
+// @desc    Update a parking spot
+// @access  Private (Admin only)
+router.put('/parkings/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const parking = await Parking.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!parking) {
+      return res.status(404).json({ success: false, message: 'Parking not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Parking updated successfully',
+      data: parking
+    });
+  } catch (error) {
+    console.error('Update parking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/parkings/:id
+// @desc    Delete a parking spot
+// @access  Private (Admin only)
+router.delete('/parkings/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const parking = await Parking.findByIdAndDelete(req.params.id);
+
+    if (!parking) {
+      return res.status(404).json({ success: false, message: 'Parking not found' });
+    }
+
+    res.json({ success: true, message: 'Parking deleted successfully' });
+  } catch (error) {
+    console.error('Delete parking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/admin/admins
+// @desc    Create a new admin user
+// @access  Private (Super Admin only)
+router.post('/admins', protect, requireSuperAdmin, async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, password, role } = req.body;
+
+    // Validate role
+    if (!['admin', 'parking_operator'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Can only create admin or parking_operator users'
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+
+    const user = new User({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password,
+      role,
+      isVerified: true
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: `${role === 'admin' ? 'Admin' : 'Parking Operator'} created successfully`,
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/admins
+// @desc    Get all admin users
+// @access  Private (Super Admin only)
+router.get('/admins', protect, requireSuperAdmin, async (req, res) => {
+  try {
+    const admins = await User.find({
+      role: { $in: ['admin', 'parking_operator', 'super_admin'] }
+    }).select('-password').sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: admins
+    });
+  } catch (error) {
+    console.error('Get admins error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/admins/:id
+// @desc    Delete an admin user
+// @access  Private (Super Admin only)
+router.delete('/admins/:id', protect, requireSuperAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting super_admin
+    if (user.role === 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Cannot delete super admin' });
+    }
+
+    // Prevent deleting yourself
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Cannot delete yourself' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'Admin user deleted successfully' });
+  } catch (error) {
+    console.error('Delete admin error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
