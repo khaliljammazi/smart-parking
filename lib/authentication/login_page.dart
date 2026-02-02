@@ -161,7 +161,15 @@ class _LoginPageState extends State<LoginPage> {
               _currentUserId = user['_id'] ?? user['id'];
             });
           } else {
-            Navigator.of(context).pushReplacementNamed('/home');
+            // Check user role and route accordingly
+            if (user != null &&
+                (user['role'] == 'admin' ||
+                    user['role'] == 'super_admin' ||
+                    user['role'] == 'parking_operator')) {
+              Navigator.of(context).pushReplacementNamed('/admin');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/home');
+            }
           }
         }
       }

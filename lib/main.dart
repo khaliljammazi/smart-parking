@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'introduction/splash_page.dart';
 import 'utils/theme_provider.dart';
 import 'utils/route_guard.dart';
+import 'utils/app_localizations.dart';
 import 'authentication/auth_provider.dart';
 import 'authentication/login_page.dart';
 import 'authentication/forgot_password_page.dart';
@@ -28,6 +30,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (context) => LanguageProvider()),
       ],
       child: const MyApp(),
     ),
@@ -61,12 +64,23 @@ class _MyAppState extends State<MyApp> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.setAuthenticated(token);
 
-      // Clean up the URL
+      // Clean up the URL and route based on role
       if (mounted) {
-        // You might want to use a more sophisticated URL cleaning approach
-        // For now, we'll just navigate to the home route
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          // Check user role and route accordingly
+          final user = authProvider.userProfile;
+          if (user != null &&
+              (user['role'] == 'admin' ||
+                  user['role'] == 'super_admin' ||
+                  user['role'] == 'parking_operator')) {
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/admin', (route) => false);
+          } else {
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/home', (route) => false);
+          }
         });
       }
     }
@@ -74,18 +88,33 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ThemeProvider, AuthProvider>(
-      builder: (context, themeProvider, authProvider, child) {
+    return Consumer3<ThemeProvider, AuthProvider, LanguageProvider>(
+      builder: (context, themeProvider, authProvider, languageProvider, child) {
         return MaterialApp(
           title: 'Parking Intelligent',
           theme: themeProvider.lightTheme,
           darkTheme: themeProvider.darkTheme,
-          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: themeProvider.isDarkMode
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          // Localization setup
+          locale: languageProvider.locale,
+          supportedLocales: const [
+            Locale('fr'), // French (default)
+            Locale('en'), // English
+          ],
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           home: const AuthWrapper(),
           routes: {
             '/login': (context) => const LoginPage(),
             '/home': (context) => const BottomBarPage(),
-            '/admin': (context) => const AdminRouteGuard(child: AdminDashboardPage()),
+            '/admin': (context) =>
+                const AdminRouteGuard(child: AdminDashboardPage()),
             '/forgot-password': (context) => const ForgotPasswordPage(),
             '/settings': (context) => const SettingsPage(),
             '/notifications': (context) => const NotificationPage(),

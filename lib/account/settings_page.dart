@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../utils/theme_provider.dart';
 import '../utils/constanst.dart';
 import '../utils/role_helper.dart';
+import '../utils/app_localizations.dart';
 import '../authentication/auth_provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -16,24 +17,19 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _notificationsEnabled = true;
   bool _pushBookingReminders = true;
   bool _pushPromotions = false;
-  String _selectedLanguage = 'Français';
-
-  final List<String> _languages = [
-    'Français',
-    'English',
-    'العربية',
-  ];
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
+    final languageProvider = Provider.of<LanguageProvider>(context);
     final isDark = themeProvider.isDarkMode;
     final userRole = authProvider.userProfile?['role'];
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Paramètres'),
+        title: Text(l10n.tr('settings')),
         backgroundColor: isDark ? const Color(0xFF1A1F3A) : AppColor.navy,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -42,72 +38,82 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           // Appearance Section
-          _buildSectionHeader('Apparence'),
-          _buildDarkModeToggle(themeProvider, isDark),
+          _buildSectionHeader(l10n.tr('appearance')),
+          _buildDarkModeToggle(themeProvider, isDark, l10n),
           const Divider(height: 1),
-          
+
           // Language Section
-          _buildSectionHeader('Langue'),
-          _buildLanguageSelector(isDark),
+          _buildSectionHeader(l10n.tr('language')),
+          _buildLanguageSelector(isDark, languageProvider, l10n),
           const Divider(height: 1),
-          
+
           // Notifications Section
-          _buildSectionHeader('Notifications'),
+          _buildSectionHeader(l10n.tr('notifications')),
           _buildNotificationToggle(
-            title: 'Notifications Push',
-            subtitle: 'Recevoir toutes les notifications',
+            title: l10n.tr('push_notifications'),
+            subtitle: languageProvider.locale.languageCode == 'fr'
+                ? 'Recevoir toutes les notifications'
+                : 'Receive all notifications',
             value: _notificationsEnabled,
             onChanged: (value) => setState(() => _notificationsEnabled = value),
             isDark: isDark,
           ),
           _buildNotificationToggle(
-            title: 'Rappels de réservation',
-            subtitle: 'Rappels avant votre réservation',
+            title: l10n.tr('booking_reminders'),
+            subtitle: languageProvider.locale.languageCode == 'fr'
+                ? 'Rappels avant votre réservation'
+                : 'Reminders before your booking',
             value: _pushBookingReminders,
-            onChanged: _notificationsEnabled 
+            onChanged: _notificationsEnabled
                 ? (value) => setState(() => _pushBookingReminders = value)
                 : null,
             isDark: isDark,
           ),
           _buildNotificationToggle(
-            title: 'Promotions & Offres',
-            subtitle: 'Offres spéciales et réductions',
+            title: l10n.tr('promotions'),
+            subtitle: languageProvider.locale.languageCode == 'fr'
+                ? 'Offres spéciales et réductions'
+                : 'Special offers and discounts',
             value: _pushPromotions,
-            onChanged: _notificationsEnabled 
+            onChanged: _notificationsEnabled
                 ? (value) => setState(() => _pushPromotions = value)
                 : null,
             isDark: isDark,
           ),
           const Divider(height: 1),
-          
+
           // Account Section
-          _buildSectionHeader('Compte'),
+          _buildSectionHeader(l10n.tr('account')),
           _buildMenuTile(
             icon: Icons.person_outline,
-            title: 'Informations personnelles',
+            title: l10n.tr('personal_info'),
             onTap: () => Navigator.pushNamed(context, '/profile'),
             isDark: isDark,
           ),
           _buildMenuTile(
             icon: Icons.lock_outline,
-            title: 'Changer le mot de passe',
-            onTap: () => _showChangePasswordDialog(),
+            title: l10n.tr('change_password'),
+            onTap: () => _showChangePasswordDialog(l10n),
             isDark: isDark,
           ),
           _buildMenuTile(
             icon: Icons.payment_outlined,
-            title: 'Méthodes de paiement',
-            onTap: () => _showComingSoon('Méthodes de paiement'),
+            title: l10n.tr('payment_methods'),
+            onTap: () => _showComingSoon(l10n.tr('payment_methods'), l10n),
             isDark: isDark,
           ),
           const Divider(height: 1),
-          
+
           // Admin Section (only for admins)
           if (RoleHelper.isAdmin(userRole)) ...[
-            _buildSectionHeader('Administration'),
+            _buildSectionHeader(
+              languageProvider.locale.languageCode == 'fr'
+                  ? 'Administration'
+                  : 'Administration',
+            ),
             _buildMenuTile(
               icon: Icons.admin_panel_settings,
-              title: 'Tableau de bord Admin',
+              title: l10n.tr('admin_dashboard'),
               subtitle: RoleHelper.getRoleName(userRole),
               onTap: () => Navigator.pushNamed(context, '/admin'),
               isDark: isDark,
@@ -115,54 +121,65 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const Divider(height: 1),
           ],
-          
+
           // Support Section
-          _buildSectionHeader('Support'),
+          _buildSectionHeader(
+            languageProvider.locale.languageCode == 'fr'
+                ? 'Support'
+                : 'Support',
+          ),
           _buildMenuTile(
             icon: Icons.help_outline,
-            title: 'Centre d\'aide',
-            onTap: () => _showComingSoon('Centre d\'aide'),
+            title: l10n.tr('help_support'),
+            onTap: () => _showComingSoon(l10n.tr('help_support'), l10n),
             isDark: isDark,
           ),
           _buildMenuTile(
             icon: Icons.chat_bubble_outline,
-            title: 'Nous contacter',
-            onTap: () => _showComingSoon('Contact'),
+            title: languageProvider.locale.languageCode == 'fr'
+                ? 'Nous contacter'
+                : 'Contact Us',
+            onTap: () => _showComingSoon(
+              languageProvider.locale.languageCode == 'fr'
+                  ? 'Contact'
+                  : 'Contact',
+              l10n,
+            ),
             isDark: isDark,
           ),
           _buildMenuTile(
             icon: Icons.privacy_tip_outlined,
-            title: 'Politique de confidentialité',
-            onTap: () => _showComingSoon('Politique de confidentialité'),
+            title: l10n.tr('privacy_policy'),
+            onTap: () => _showComingSoon(l10n.tr('privacy_policy'), l10n),
             isDark: isDark,
           ),
           _buildMenuTile(
             icon: Icons.description_outlined,
-            title: 'Conditions d\'utilisation',
-            onTap: () => _showComingSoon('Conditions d\'utilisation'),
+            title: l10n.tr('terms_of_service'),
+            onTap: () => _showComingSoon(l10n.tr('terms_of_service'), l10n),
             isDark: isDark,
           ),
           const Divider(height: 1),
-          
+
           // App Info
-          _buildSectionHeader('À propos'),
+          _buildSectionHeader(l10n.tr('about')),
           _buildMenuTile(
             icon: Icons.info_outline,
-            title: 'Version de l\'application',
+            title: '${l10n.tr('version')} de l\'application',
             subtitle: '1.0.0 (Build 1)',
             onTap: null,
             isDark: isDark,
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Logout Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ElevatedButton.icon(
               onPressed: () => _handleLogout(authProvider),
               icon: const Icon(Icons.logout),
-              label: const Text('Déconnexion'),
+              label: Text(l10n.tr('logout')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade50,
                 foregroundColor: Colors.red,
@@ -194,7 +211,11 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildDarkModeToggle(ThemeProvider themeProvider, bool isDark) {
+  Widget _buildDarkModeToggle(
+    ThemeProvider themeProvider,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
     return ListTile(
       leading: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
@@ -211,11 +232,15 @@ class _SettingsPageState extends State<SettingsPage> {
           size: 28,
         ),
       ),
-      title: const Text(
-        'Mode sombre',
-        style: TextStyle(fontWeight: FontWeight.w500),
+      title: Text(
+        l10n.tr('dark_mode'),
+        style: const TextStyle(fontWeight: FontWeight.w500),
       ),
-      subtitle: Text(isDark ? 'Activé' : 'Désactivé'),
+      subtitle: Text(
+        isDark
+            ? (l10n.locale.languageCode == 'fr' ? 'Activé' : 'Enabled')
+            : (l10n.locale.languageCode == 'fr' ? 'Désactivé' : 'Disabled'),
+      ),
       trailing: Switch.adaptive(
         value: isDark,
         onChanged: (value) => themeProvider.toggleTheme(),
@@ -224,20 +249,24 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildLanguageSelector(bool isDark) {
+  Widget _buildLanguageSelector(
+    bool isDark,
+    LanguageProvider languageProvider,
+    AppLocalizations l10n,
+  ) {
     return ListTile(
       leading: Icon(
         Icons.language,
         color: isDark ? Colors.blue.shade300 : AppColor.navy,
         size: 28,
       ),
-      title: const Text(
-        'Langue',
-        style: TextStyle(fontWeight: FontWeight.w500),
+      title: Text(
+        l10n.tr('language'),
+        style: const TextStyle(fontWeight: FontWeight.w500),
       ),
-      subtitle: Text(_selectedLanguage),
+      subtitle: Text(languageProvider.languageName),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => _showLanguageDialog(),
+      onTap: () => _showLanguageDialog(languageProvider, l10n),
     );
   }
 
@@ -283,34 +312,56 @@ class _SettingsPageState extends State<SettingsPage> {
         icon,
         color: iconColor ?? (isDark ? Colors.blue.shade300 : AppColor.navy),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w500),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
       subtitle: subtitle != null ? Text(subtitle) : null,
       trailing: onTap != null ? const Icon(Icons.chevron_right) : null,
       onTap: onTap,
     );
   }
 
-  void _showLanguageDialog() {
+  void _showLanguageDialog(
+    LanguageProvider languageProvider,
+    AppLocalizations l10n,
+  ) {
+    final languages = [
+      {'code': 'fr', 'name': 'Français', 'flag': '🇫🇷'},
+      {'code': 'en', 'name': 'English', 'flag': '🇬🇧'},
+    ];
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Choisir la langue'),
+        title: Text(
+          l10n.locale.languageCode == 'fr'
+              ? 'Choisir la langue'
+              : 'Choose Language',
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: _languages.map((lang) {
+          children: languages.map((lang) {
             return RadioListTile<String>(
-              title: Text(lang),
-              value: lang,
-              groupValue: _selectedLanguage,
+              title: Row(
+                children: [
+                  Text(
+                    lang['flag'] as String,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(lang['name'] as String),
+                ],
+              ),
+              value: lang['code'] as String,
+              groupValue: languageProvider.languageCode,
               onChanged: (value) {
-                setState(() => _selectedLanguage = value!);
+                languageProvider.setLanguage(value!);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Langue changée en $value'),
+                    content: Text(
+                      value == 'fr'
+                          ? 'Langue changée en Français'
+                          : 'Language changed to English',
+                    ),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -321,49 +372,52 @@ class _SettingsPageState extends State<SettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+            child: Text(l10n.tr('cancel')),
           ),
         ],
       ),
     );
   }
 
-  void _showChangePasswordDialog() {
+  void _showChangePasswordDialog(AppLocalizations l10n) {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    final isFrench = l10n.locale.languageCode == 'fr';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Changer le mot de passe'),
+        title: Text(l10n.tr('change_password')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: currentPasswordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mot de passe actuel',
-                prefixIcon: Icon(Icons.lock_outline),
+              decoration: InputDecoration(
+                labelText: isFrench
+                    ? 'Mot de passe actuel'
+                    : 'Current password',
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: newPasswordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Nouveau mot de passe',
-                prefixIcon: Icon(Icons.lock),
+              decoration: InputDecoration(
+                labelText: l10n.tr('new_password'),
+                prefixIcon: const Icon(Icons.lock),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: confirmPasswordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Confirmer le mot de passe',
-                prefixIcon: Icon(Icons.lock),
+              decoration: InputDecoration(
+                labelText: l10n.tr('confirm_password'),
+                prefixIcon: const Icon(Icons.lock),
               ),
             ),
           ],
@@ -371,45 +425,56 @@ class _SettingsPageState extends State<SettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+            child: Text(l10n.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () {
               // TODO: Implement password change
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Mot de passe modifié avec succès'),
+                SnackBar(
+                  content: Text(
+                    isFrench
+                        ? 'Mot de passe modifié avec succès'
+                        : 'Password changed successfully',
+                  ),
                   backgroundColor: Colors.green,
                 ),
               );
             },
-            child: const Text('Changer'),
+            child: Text(isFrench ? 'Changer' : 'Change'),
           ),
         ],
       ),
     );
   }
 
-  void _showComingSoon(String feature) {
+  void _showComingSoon(String feature, AppLocalizations l10n) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature - Bientôt disponible'),
+        content: Text('$feature - ${l10n.tr('coming_soon')}'),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   Future<void> _handleLogout(AuthProvider authProvider) async {
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
+    final isFrench = languageProvider.locale.languageCode == 'fr';
+    final l10n = context.l10n;
+
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        title: Text(l10n.tr('logout')),
+        content: Text(l10n.tr('are_you_sure')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(l10n.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -417,7 +482,7 @@ class _SettingsPageState extends State<SettingsPage> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Déconnexion'),
+            child: Text(l10n.tr('logout')),
           ),
         ],
       ),
