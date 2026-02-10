@@ -49,5 +49,9 @@
 	<string>This app needs access to your location to show nearby parking spots and provide navigation.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs access to your location to show nearby parking spots and provide navigation.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to scan QR codes for payment and parking validation.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app would like to track your activity to provide personalized parking recommendations.</string>
 </dict>
 </plist>

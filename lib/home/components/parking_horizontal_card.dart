@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/constanst.dart';
 import '../../utils/text/regular.dart';
 import '../../utils/text/semi_bold.dart';
+import '../../utils/favorites_provider.dart';
 
 class ParkingCardHome extends StatelessWidget {
   final String title;
@@ -11,7 +13,7 @@ class ParkingCardHome extends StatelessWidget {
   final double? motoPrice;
   final String address;
   final bool isFavorite;
-  final int id;
+  final String parkingId; // Changed from int id to String parkingId
 
   const ParkingCardHome({
     super.key,
@@ -22,13 +24,13 @@ class ParkingCardHome extends StatelessWidget {
     this.motoPrice,
     required this.address,
     required this.isFavorite,
-    required this.id,
+    required this.parkingId, // Changed parameter name
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
+      width: 300, // Fixed width for horizontal ListView
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -44,20 +46,47 @@ class ParkingCardHome extends StatelessWidget {
       child: Row(
         children: [
           // Image
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-              image: DecorationImage(
-                image: imagePath != null
-                    ? NetworkImage(imagePath!)
-                    : const AssetImage('assets/image/home_banner.png') as ImageProvider,
-                fit: BoxFit.cover,
-              ),
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              bottomLeft: Radius.circular(12),
+            ),
+            child: Container(
+              width: 100,
+              height: 100,
+              color: Colors.grey[200],
+              child: imagePath != null
+                  ? Image.network(
+                      imagePath!,
+                      fit: BoxFit.cover,
+                      width: 100,
+                      height: 100,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/image/home_banner.png',
+                          fit: BoxFit.cover,
+                          width: 100,
+                          height: 100,
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/image/home_banner.png',
+                      fit: BoxFit.cover,
+                      width: 100,
+                      height: 100,
+                    ),
             ),
           ),
 
@@ -80,10 +109,22 @@ class ParkingCardHome extends StatelessWidget {
                           maxLine: 1,
                         ),
                       ),
-                      Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? Colors.red : Colors.grey,
-                        size: 20,
+                      Consumer<FavoritesProvider>(
+                        builder: (context, favProvider, child) {
+                          final isFav = favProvider.isFavorite(parkingId);
+                          return IconButton(
+                            onPressed: () {
+                              favProvider.toggleFavorite(parkingId);
+                            },
+                            icon: Icon(
+                              isFav ? Icons.favorite : Icons.favorite_border,
+                              color: isFav ? Colors.red : Colors.grey,
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          );
+                        },
                       ),
                     ],
                   ),

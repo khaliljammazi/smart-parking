@@ -107,6 +107,12 @@ const userSchema = new mongoose.Schema({
     ref: 'Vehicle'
   }],
 
+  // Favorite Parkings
+  favoriteParkings: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Parking'
+  }],
+
   // Account Status
   isActive: {
     type: Boolean,

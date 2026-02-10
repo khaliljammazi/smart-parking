@@ -217,10 +217,10 @@ class BookingService {
   }
 
   // Cancel booking
-  static Future<bool> cancelBooking(String bookingId) async {
+  static Future<Map<String, dynamic>?> cancelBooking(String bookingId, {String? reason}) async {
     try {
       final token = await AuthService.getToken();
-      if (token == null) return false;
+      if (token == null) return null;
 
       final response = await http.delete(
         Uri.parse('$baseUrl/bookings/$bookingId'),
@@ -228,12 +228,48 @@ class BookingService {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
+        body: json.encode({
+          if (reason != null) 'reason': reason,
+        }),
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
     } catch (e) {
       print('Error cancelling booking: $e');
-      return false;
+      return null;
+    }
+  }
+
+  // Modify booking (extend time)
+  static Future<Map<String, dynamic>?> extendBooking({
+    required String bookingId,
+    required int additionalHours,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/bookings/$bookingId/extend'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'additionalHours': additionalHours,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error extending booking: $e');
+      return null;
     }
   }
 }

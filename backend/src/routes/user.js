@@ -339,4 +339,108 @@ router.put('/vehicles/:id/default', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/favorites
+// @desc    Get user's favorite parkings
+// @access  Private
+router.get('/favorites', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate('favoriteParkings')
+      .select('favoriteParkings');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { favorites: user.favoriteParkings || [] }
+    });
+  } catch (error) {
+    console.error('Get favorites error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   POST /api/users/favorites/:parkingId
+// @desc    Add parking to favorites
+// @access  Private
+router.post('/favorites/:parkingId', protect, async (req, res) => {
+  try {
+    const { parkingId } = req.params;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if already in favorites
+    if (user.favoriteParkings.includes(parkingId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parking already in favorites'
+      });
+    }
+
+    user.favoriteParkings.push(parkingId);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Parking added to favorites',
+      data: { favorites: user.favoriteParkings }
+    });
+  } catch (error) {
+    console.error('Add favorite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   DELETE /api/users/favorites/:parkingId
+// @desc    Remove parking from favorites
+// @access  Private
+router.delete('/favorites/:parkingId', protect, async (req, res) => {
+  try {
+    const { parkingId } = req.params;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Remove from favorites
+    user.favoriteParkings = user.favoriteParkings.filter(
+      id => id.toString() !== parkingId
+    );
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Parking removed from favorites',
+      data: { favorites: user.favoriteParkings }
+    });
+  } catch (error) {
+    console.error('Remove favorite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 module.exports = router;

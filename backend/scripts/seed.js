@@ -5,6 +5,182 @@ require('dotenv').config();
 
 // Create parking data matching the actual Parking model schema
 const createSampleParkings = (ownerId) => [
+  // HAMMAMET PARKINGS
+  {
+    name: 'Parking Marina Yasmine',
+    description: 'Grand parking sécurisé à Yasmine Hammamet, proche de la marina',
+    address: {
+      street: 'Port de Plaisance Yasmine',
+      city: 'Hammamet',
+      postalCode: '8050',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 36.3800,
+      longitude: 10.6350
+    },
+    totalSpots: 80,
+    availableSpots: 40,
+    pricing: {
+      hourly: 3.5,
+      daily: 30,
+      monthly: 220
+    },
+    features: ['covered', 'security', 'cctv', 'lighting', '24_7'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '00:00', close: '23:59' },
+      tuesday: { open: '00:00', close: '23:59' },
+      wednesday: { open: '00:00', close: '23:59' },
+      thursday: { open: '00:00', close: '23:59' },
+      friday: { open: '00:00', close: '23:59' },
+      saturday: { open: '00:00', close: '23:59' },
+      sunday: { open: '00:00', close: '23:59' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+  {
+    name: 'Parking Médina Hammamet',
+    description: 'Parking à proximité de la médina historique',
+    address: {
+      street: 'Avenue Habib Bourguiba',
+      city: 'Hammamet',
+      postalCode: '8050',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 36.4000,
+      longitude: 10.6167
+    },
+    totalSpots: 40,
+    availableSpots: 35,
+    pricing: {
+      hourly: 2.0,
+      daily: 18,
+      monthly: 140
+    },
+    features: ['security', 'cctv', 'disabled_access'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '07:00', close: '22:00' },
+      tuesday: { open: '07:00', close: '22:00' },
+      wednesday: { open: '07:00', close: '22:00' },
+      thursday: { open: '07:00', close: '22:00' },
+      friday: { open: '07:00', close: '22:00' },
+      saturday: { open: '07:00', close: '23:00' },
+      sunday: { open: '07:00', close: '23:00' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+  {
+    name: 'Parking Plage Hammamet',
+    description: 'Parking près de la plage publique',
+    address: {
+      street: 'Avenue de la Corniche',
+      city: 'Hammamet',
+      postalCode: '8050',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 36.4050,
+      longitude: 10.6200
+    },
+    totalSpots: 60,
+    availableSpots: 20,
+    pricing: {
+      hourly: 4.0,
+      daily: 35,
+      monthly: 250
+    },
+    features: ['security', 'lighting', 'car_wash'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '06:00', close: '20:00' },
+      tuesday: { open: '06:00', close: '20:00' },
+      wednesday: { open: '06:00', close: '20:00' },
+      thursday: { open: '06:00', close: '20:00' },
+      friday: { open: '06:00', close: '22:00' },
+      saturday: { open: '06:00', close: '22:00' },
+      sunday: { open: '06:00', close: '22:00' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+  {
+    name: 'Parking Central Hammamet',
+    description: 'Parking au coeur du centre-ville',
+    address: {
+      street: 'Rue Ali Belhouane',
+      city: 'Hammamet',
+      postalCode: '8050',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 36.3995,
+      longitude: 10.6150
+    },
+    totalSpots: 50,
+    availableSpots: 25,
+    pricing: {
+      hourly: 2.5,
+      daily: 22,
+      monthly: 170
+    },
+    features: ['covered', 'security', 'payment_terminal'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '00:00', close: '23:59' },
+      tuesday: { open: '00:00', close: '23:59' },
+      wednesday: { open: '00:00', close: '23:59' },
+      thursday: { open: '00:00', close: '23:59' },
+      friday: { open: '00:00', close: '23:59' },
+      saturday: { open: '00:00', close: '23:59' },
+      sunday: { open: '00:00', close: '23:59' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+
+  // NABEUL PARKINGS
+  {
+    name: 'Parking Marché Nabeul',
+    description: 'Parking à proximité du célèbre marché de Nabeul',
+    address: {
+      street: 'Avenue Farhat Hached',
+      city: 'Nabeul',
+      postalCode: '8000',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 36.4561,
+      longitude: 10.7376
+    },
+    totalSpots: 45,
+    availableSpots: 28,
+    pricing: {
+      hourly: 2.0,
+      daily: 16,
+      monthly: 130
+    },
+    features: ['security', 'cctv'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '07:00', close: '19:00' },
+      tuesday: { open: '07:00', close: '19:00' },
+      wednesday: { open: '07:00', close: '19:00' },
+      thursday: { open: '07:00', close: '19:00' },
+      friday: { open: '07:00', close: '20:00' },
+      saturday: { open: '07:00', close: '20:00' },
+      sunday: { open: '07:00', close: '19:00' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+
+  // TUNIS PARKINGS
+  // TUNIS PARKINGS
   {
     name: 'Parking Central Tunis',
     description: 'Parking spacieux au centre-ville de Tunis',
@@ -15,17 +191,17 @@ const createSampleParkings = (ownerId) => [
       country: 'Tunisia'
     },
     coordinates: {
-      longitude: 10.1815,
-      latitude: 36.8065
+      latitude: 36.8065,
+      longitude: 10.1815
     },
-    totalSpots: 50,
-    availableSpots: 25,
+    totalSpots: 70,
+    availableSpots: 45,
     pricing: {
-      hourly: 2.5,
-      daily: 20,
-      monthly: 150
+      hourly: 3.0,
+      daily: 25,
+      monthly: 200
     },
-    features: ['covered', 'security', 'ev_charging'],
+    features: ['covered', 'security', 'ev_charging', 'disabled_access', '24_7'],
     owner: ownerId,
     isActive: true,
     operatingHours: {
@@ -49,17 +225,17 @@ const createSampleParkings = (ownerId) => [
       country: 'Tunisia'
     },
     coordinates: {
-      longitude: 10.1725,
-      latitude: 36.8095
+      latitude: 36.8095,
+      longitude: 10.1725
     },
-    totalSpots: 30,
-    availableSpots: 10,
+    totalSpots: 35,
+    availableSpots: 15,
     pricing: {
-      hourly: 3.0,
-      daily: 25,
-      monthly: 180
+      hourly: 3.5,
+      daily: 28,
+      monthly: 210
     },
-    features: ['covered', 'security', 'disabled_access'],
+    features: ['covered', 'security', 'disabled_access', 'valet'],
     owner: ownerId,
     isActive: true,
     operatingHours: {
@@ -83,17 +259,125 @@ const createSampleParkings = (ownerId) => [
       country: 'Tunisia'
     },
     coordinates: {
-      longitude: 10.1650,
-      latitude: 36.8200
+      latitude: 36.8200,
+      longitude: 10.1650
     },
-    totalSpots: 40,
+    totalSpots: 55,
+    availableSpots: 32,
+    pricing: {
+      hourly: 2.5,
+      daily: 20,
+      monthly: 160
+    },
+    features: ['security', 'cctv', 'lighting'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '00:00', close: '23:59' },
+      tuesday: { open: '00:00', close: '23:59' },
+      wednesday: { open: '00:00', close: '23:59' },
+      thursday: { open: '00:00', close: '23:59' },
+      friday: { open: '00:00', close: '23:59' },
+      saturday: { open: '00:00', close: '23:59' },
+      sunday: { open: '00:00', close: '23:59' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+
+  // SOUSSE PARKINGS
+  {
+    name: 'Parking Port Sousse',
+    description: 'Parking sécurisé près du port de Sousse',
+    address: {
+      street: 'Avenue Hédi Chaker',
+      city: 'Sousse',
+      postalCode: '4000',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 35.8256,
+      longitude: 10.6411
+    },
+    totalSpots: 65,
+    availableSpots: 35,
+    pricing: {
+      hourly: 2.5,
+      daily: 22,
+      monthly: 170
+    },
+    features: ['covered', 'security', 'cctv', 'payment_terminal'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '00:00', close: '23:59' },
+      tuesday: { open: '00:00', close: '23:59' },
+      wednesday: { open: '00:00', close: '23:59' },
+      thursday: { open: '00:00', close: '23:59' },
+      friday: { open: '00:00', close: '23:59' },
+      saturday: { open: '00:00', close: '23:59' },
+      sunday: { open: '00:00', close: '23:59' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+
+  // SFAX PARKINGS
+  {
+    name: 'Parking Centre Ville Sfax',
+    description: 'Grand parking au centre de Sfax',
+    address: {
+      street: 'Avenue Habib Bourguiba',
+      city: 'Sfax',
+      postalCode: '3000',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 34.7406,
+      longitude: 10.7603
+    },
+    totalSpots: 60,
     availableSpots: 30,
     pricing: {
-      hourly: 2.0,
-      daily: 15,
-      monthly: 120
+      hourly: 2.5,
+      daily: 20,
+      monthly: 155
     },
-    features: ['security', 'cctv'],
+    features: ['security', 'cctv', 'disabled_access'],
+    owner: ownerId,
+    isActive: true,
+    operatingHours: {
+      monday: { open: '07:00', close: '21:00' },
+      tuesday: { open: '07:00', close: '21:00' },
+      wednesday: { open: '07:00', close: '21:00' },
+      thursday: { open: '07:00', close: '21:00' },
+      friday: { open: '07:00', close: '21:00' },
+      saturday: { open: '07:00', close: '21:00' },
+      sunday: { open: '08:00', close: '20:00' }
+    },
+    images: ['https://via.placeholder.com/300x200']
+  },
+
+  // MONASTIR PARKINGS
+  {
+    name: 'Parking Aéroport Monastir',
+    description: 'Parking à l\'aéroport international de Monastir',
+    address: {
+      street: 'Route de l\'Aéroport',
+      city: 'Monastir',
+      postalCode: '5000',
+      country: 'Tunisia'
+    },
+    coordinates: {
+      latitude: 35.7777,
+      longitude: 10.8264
+    },
+    totalSpots: 120,
+    availableSpots: 75,
+    pricing: {
+      hourly: 3.5,
+      daily: 30,
+      monthly: 250
+    },
+    features: ['covered', 'security', 'cctv', '24_7', 'disabled_access', 'payment_terminal'],
     owner: ownerId,
     isActive: true,
     operatingHours: {

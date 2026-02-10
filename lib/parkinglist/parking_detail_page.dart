@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
+import '../utils/favorites_provider.dart';
 import '../booking/booking_service.dart';
 import '../booking/qr_code_dialog.dart';
 
@@ -79,6 +81,9 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final isFavorite = favoritesProvider.isFavorite(widget.parking.id);
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: CustomScrollView(
@@ -88,6 +93,28 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
             expandedHeight: 200,
             pinned: true,
             backgroundColor: AppColor.navy,
+            actions: [
+              IconButton(
+                icon: Icon(
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: isFavorite ? Colors.red : Colors.white,
+                ),
+                onPressed: () {
+                  favoritesProvider.toggleFavorite(widget.parking.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isFavorite
+                            ? 'Retiré des favoris'
+                            : 'Ajouté aux favoris',
+                      ),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: isFavorite ? Colors.grey : Colors.green,
+                    ),
+                  );
+                },
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 widget.parking.name,

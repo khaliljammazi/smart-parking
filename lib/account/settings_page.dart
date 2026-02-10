@@ -330,51 +330,62 @@ class _SettingsPageState extends State<SettingsPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          l10n.locale.languageCode == 'fr'
-              ? 'Choisir la langue'
-              : 'Choose Language',
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: languages.map((lang) {
-            return RadioListTile<String>(
-              title: Row(
-                children: [
-                  Text(
-                    lang['flag'] as String,
-                    style: const TextStyle(fontSize: 24),
+      builder: (context) => Consumer<LanguageProvider>(
+        builder: (context, provider, child) {
+          return AlertDialog(
+            title: Text(
+              provider.languageCode == 'fr'
+                  ? 'Choisir la langue'
+                  : 'Choose Language',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: languages.map((lang) {
+                return RadioListTile<String>(
+                  title: Row(
+                    children: [
+                      Text(
+                        lang['flag'] as String,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(lang['name'] as String),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Text(lang['name'] as String),
-                ],
-              ),
-              value: lang['code'] as String,
-              groupValue: languageProvider.languageCode,
-              onChanged: (value) {
-                languageProvider.setLanguage(value!);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      value == 'fr'
-                          ? 'Langue changée en Français'
-                          : 'Language changed to English',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                  value: lang['code'] as String,
+                  groupValue: provider.languageCode,
+                  onChanged: (value) async {
+                    if (value != null) {
+                      await provider.setLanguage(value);
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              value == 'fr'
+                                  ? 'Langue changée en Français'
+                                  : 'Language changed to English',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    }
+                  },
                 );
-              },
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.tr('cancel')),
-          ),
-        ],
+              }).toList(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  provider.languageCode == 'fr' ? 'Annuler' : 'Cancel',
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

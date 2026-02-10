@@ -49,19 +49,43 @@ class NearByCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image
-          Container(
-            height: 140,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              image: DecorationImage(
-                image: imagePath != null
-                    ? NetworkImage(imagePath!)
-                    : const AssetImage('assets/image/home_banner.png') as ImageProvider,
-                fit: BoxFit.cover,
-              ),
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
+            child: Container(
+              height: 140,
+              color: Colors.grey[200],
+              child: imagePath != null
+                  ? Image.network(
+                      imagePath!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/image/home_banner.png',
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/image/home_banner.png',
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
             ),
           ),
 

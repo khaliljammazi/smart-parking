@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
+import '../utils/favorites_provider.dart';
 
 class MapPage extends StatefulWidget {
   final Function(double lat, double lng)? onLocationSelected;
@@ -80,51 +82,102 @@ class _MapPageState extends State<MapPage> {
   void _showParkingDetails(ParkingSpot parking) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              parking.name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(parking.address),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 16),
-                Text(' ${parking.rating}'),
-                const SizedBox(width: 16),
-                Text('${parking.pricePerHour} DT/h'),
-                const SizedBox(width: 16),
-                Text('${parking.availableSpots} places'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Réservation pour ${parking.name}')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.navy,
-                ),
-                child: const Text('Réserver'),
-              ),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (context) {
+        final favoritesProvider = Provider.of<FavoritesProvider>(context);
+        final isFavorite = favoritesProvider.isFavorite(parking.id.toString());
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      parking.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : Colors.grey,
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      favoritesProvider.toggleFavorite(parking.id.toString());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isFavorite
+                                ? 'Retiré des favoris'
+                                : 'Ajouté aux favoris',
+                          ),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: isFavorite ? Colors.grey : Colors.green,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(parking.address)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 18),
+                  const SizedBox(width: 4),
+                  Text('${parking.rating}'),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.attach_money, size: 18, color: Colors.green),
+                  Text('${parking.pricePerHour} DT/h'),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.local_parking, size: 18, color: Colors.blue),
+                  Text('${parking.availableSpots} places'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Réservation pour ${parking.name}')),
+                    );
+                  },
+                  icon: const Icon(Icons.calendar_today),
+                  label: const Text('Réserver'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColor.navy,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -6,11 +6,14 @@ import 'introduction/splash_page.dart';
 import 'utils/theme_provider.dart';
 import 'utils/route_guard.dart';
 import 'utils/app_localizations.dart';
+import 'utils/favorites_provider.dart';
+import 'utils/notification_service.dart';
 import 'authentication/auth_provider.dart';
 import 'authentication/login_page.dart';
 import 'authentication/forgot_password_page.dart';
 import 'authentication/phone_number_dialog.dart';
 import 'authentication/vehicle_required_dialog.dart';
+import 'vehicle/vehicle_provider.dart';
 import 'bottombar/bottombar_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'account/settings_page.dart';
@@ -19,10 +22,15 @@ import 'notification/notification_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Only load dotenv on non-web platforms
+  // Initialize Firebase and notifications
   if (!kIsWeb) {
-    // For mobile/desktop, we could load dotenv here if needed
-    // await dotenv.load(fileName: ".env");
+    try {
+      await NotificationService.initialize();
+    } catch (e) {
+      if (kIsWeb) {
+        print('Firebase not available on web: $e');
+      }
+    }
   }
 
   runApp(
@@ -31,6 +39,8 @@ void main() async {
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AuthProvider()),
         ChangeNotifierProvider(create: (context) => LanguageProvider()),
+        ChangeNotifierProvider(create: (context) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (context) => VehicleProvider()),
       ],
       child: const MyApp(),
     ),
