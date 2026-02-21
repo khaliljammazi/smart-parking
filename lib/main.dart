@@ -13,6 +13,8 @@ import 'authentication/login_page.dart';
 import 'authentication/forgot_password_page.dart';
 import 'authentication/phone_number_dialog.dart';
 import 'authentication/vehicle_required_dialog.dart';
+import 'authentication/signup_page.dart';
+import 'authentication/email_verification_page.dart';
 import 'vehicle/vehicle_provider.dart';
 import 'bottombar/bottombar_page.dart';
 import 'admin/admin_dashboard_page.dart';
@@ -126,6 +128,8 @@ class _MyAppState extends State<MyApp> {
             '/admin': (context) =>
                 const AdminRouteGuard(child: AdminDashboardPage()),
             '/forgot-password': (context) => const ForgotPasswordPage(),
+            '/signup': (context) => const SignUpPage(),
+            '/verify-email': (context) => const EmailVerificationPage(),
             '/settings': (context) => const SettingsPage(),
             '/notifications': (context) => const NotificationPage(),
           },
