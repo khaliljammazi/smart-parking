@@ -45,17 +45,17 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Vehicle'),
-        content: Text('Are you sure you want to delete the vehicle with license plate $licensePlate?'),
+        title: const Text('Supprimer le véhicule'),
+        content: Text('Êtes-vous sûr de vouloir supprimer le véhicule $licensePlate ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Supprimer'),
           ),
         ],
       ),
@@ -67,7 +67,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
         if (success && mounted) {
           _loadVehicles();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vehicle deleted successfully')),
+            const SnackBar(content: Text('Véhicule supprimé avec succès'), backgroundColor: Colors.green),
           );
         }
       } catch (e) {
@@ -103,7 +103,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
       appBar: AppBar(
         backgroundColor: AppColor.navy,
         elevation: 0,
-        title: const Text('My Vehicles', style: TextStyle(color: Colors.white)),
+        title: const Text('Mes véhicules', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
@@ -125,7 +125,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                       Icon(Icons.directions_car, size: 80, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
-                        'No vehicles added yet',
+                        'Aucun véhicule ajouté',
                         style: TextStyle(
                           fontSize: 18,
                           color: Colors.grey[600],
@@ -136,7 +136,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                       ElevatedButton.icon(
                         onPressed: _addVehicle,
                         icon: const Icon(Icons.add),
-                        label: const Text('Add Your First Vehicle'),
+                        label: const Text('Ajouter votre premier véhicule'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColor.orange,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -198,7 +198,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                         children: [
                           Icon(Icons.edit),
                           SizedBox(width: 8),
-                          Text('Edit'),
+                          Text('Modifier'),
                         ],
                       ),
                     ),
@@ -208,7 +208,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                         children: [
                           Icon(Icons.delete, color: Colors.red),
                           SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
+                          Text('Supprimer', style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),
@@ -234,11 +234,11 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Year: ${vehicle['year'] ?? 'Unknown'}',
+                        'Année: ${vehicle['year'] ?? 'Inconnu'}',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       Text(
-                        'Color: ${vehicle['color'] ?? 'Unknown'}',
+                        'Couleur: ${vehicle['color'] ?? 'Inconnu'}',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],

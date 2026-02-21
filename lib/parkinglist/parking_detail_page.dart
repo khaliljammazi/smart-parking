@@ -5,6 +5,8 @@ import '../utils/constanst.dart';
 import '../utils/favorites_provider.dart';
 import '../booking/booking_service.dart';
 import '../booking/qr_code_dialog.dart';
+import '../notification/backend_notification_service.dart';
+import '../vehicle/vehicle_service.dart';
 
 class ParkingDetailPage extends StatefulWidget {
   final ParkingModel parking;
@@ -29,17 +31,48 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
       return;
     }
 
+    // Fetch user vehicles and let them choose
+    String? selectedVehicleId;
+    try {
+      final vehicles = await VehicleService.getUserVehicles();
+
+      if (vehicles != null && vehicles.isNotEmpty) {
+        if (vehicles.length == 1) {
+          // Auto-select the only vehicle
+          selectedVehicleId = vehicles[0]['_id']?.toString() ?? vehicles[0]['id']?.toString();
+        } else {
+          // Show vehicle selection dialog
+          if (!mounted) return;
+          selectedVehicleId = await _showVehicleSelectionDialog(vehicles);
+          if (selectedVehicleId == null) return; // User cancelled
+        }
+      }
+      // If no vehicles, proceed without vehicleId (allow reservation without vehicle)
+    } catch (e) {
+      // If vehicle fetch fails, proceed without vehicleId
+      debugPrint('Erreur récupération véhicules: $e');
+    }
+
     setState(() => _isReserving = true);
 
     try {
       final result = await BookingService.createReservation(
         parkingId: widget.parking.id,
+        vehicleId: selectedVehicleId,
       );
 
       if (result != null && mounted) {
         final booking = result['data']?['booking'];
         
         if (booking != null) {
+          // Send local notification for booking confirmation
+          final notificationService = BackendNotificationService();
+          await notificationService.showBookingConfirmation(
+            parkingName: widget.parking.name,
+            date: DateTime.now().toString().split(' ')[0],
+            time: DateTime.now().toString().split(' ')[1].substring(0, 5),
+          );
+
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -77,6 +110,99 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
         setState(() => _isReserving = false);
       }
     }
+  }
+
+  Future<String?> _showVehicleSelectionDialog(List<dynamic> vehicles) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.directions_car, color: AppColor.navy, size: 28),
+                  SizedBox(width: 8),
+                  Text(
+                    'Choisir un véhicule',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColor.navy,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sélectionnez le véhicule pour cette réservation',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              ...vehicles.map((vehicle) {
+                final id = vehicle['_id']?.toString() ?? vehicle['id']?.toString() ?? '';
+                final plate = vehicle['licensePlate'] ?? '';
+                final make = vehicle['make'] ?? '';
+                final model = vehicle['model'] ?? '';
+                final color = vehicle['color'] ?? '';
+                final year = vehicle['year']?.toString() ?? '';
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColor.navy.withOpacity(0.1),
+                      child: const Icon(Icons.directions_car, color: AppColor.navy),
+                    ),
+                    title: Text(
+                      '$make $model ${year.isNotEmpty ? "($year)" : ""}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Row(
+                      children: [
+                        const Icon(Icons.confirmation_number, size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(plate),
+                        if (color.isNotEmpty) ...[
+                          const SizedBox(width: 12),
+                          const Icon(Icons.palette, size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(color),
+                        ],
+                      ],
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: AppColor.navy),
+                    onTap: () => Navigator.pop(context, id),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context, null),
+                  child: const Text(
+                    'Annuler',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override

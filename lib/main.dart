@@ -8,6 +8,7 @@ import 'utils/route_guard.dart';
 import 'utils/app_localizations.dart';
 import 'utils/favorites_provider.dart';
 import 'utils/notification_service.dart';
+import 'notification/backend_notification_service.dart';
 import 'authentication/auth_provider.dart';
 import 'authentication/login_page.dart';
 import 'authentication/forgot_password_page.dart';
@@ -31,6 +32,10 @@ void main() async {
         print('Firebase not available on web: $e');
       }
     }
+    // Initialize backend notification service
+    final backendNotifications = BackendNotificationService();
+    await backendNotifications.initialize();
+    backendNotifications.startPolling();
   }
 
   runApp(

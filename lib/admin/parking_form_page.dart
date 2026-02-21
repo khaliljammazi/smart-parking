@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/backend_api.dart';
+import 'admin_service.dart';
 import '../utils/constanst.dart';
 import '../location/map_page.dart';
 import '../model/parking_model.dart';
@@ -88,9 +88,10 @@ class _ParkingFormPageState extends State<ParkingFormPage> {
 
     bool success;
     if (widget.parking != null) {
-      success = await BackendApi.updateParking(widget.parking!.id, parkingData);
+      success = await AdminService.updateParking(widget.parking!.id, parkingData);
     } else {
-      success = await BackendApi.createParking(parkingData);
+      final result = await AdminService.createParking(parkingData);
+      success = result != null;
     }
 
     setState(() => _isLoading = false);

@@ -88,15 +88,16 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.vehicle != null
-                ? 'Vehicle updated successfully'
-                : 'Vehicle added successfully'),
+                ? 'Véhicule modifié avec succès'
+                : 'Véhicule ajouté avec succès'),
+            backgroundColor: Colors.green,
           ),
         );
         Navigator.of(context).pop(true);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to save vehicle')),
+            const SnackBar(content: Text('Échec de la sauvegarde du véhicule'), backgroundColor: Colors.red),
           );
         }
       }
@@ -121,7 +122,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         backgroundColor: AppColor.navy,
         elevation: 0,
         title: Text(
-          widget.vehicle != null ? 'Edit Vehicle' : 'Add Vehicle',
+          widget.vehicle != null ? 'Modifier le véhicule' : 'Ajouter un véhicule',
           style: const TextStyle(color: Colors.white),
         ),
         leading: IconButton(
@@ -138,7 +139,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
             children: [
               // License Plate
               const Text(
-                'License Plate',
+                'Plaque d\'immatriculation',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -148,22 +149,23 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _licensePlateController,
+                textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  hintText: 'e.g., 123 TUN 456',
+                  hintText: 'Ex: 123 TUN 4567',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
                   fillColor: Colors.white,
+                  helperText: 'Format: XXX TUN XXXX',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'License plate is required';
+                    return 'La plaque d\'immatriculation est requise';
                   }
-                  // Tunisian license plate validation
-                  final tunisianPlateRegex = RegExp(r'^\d{1,3}\s?[A-Z]{1,3}\s?\d{1,4}$');
+                  final tunisianPlateRegex = RegExp(r'^\d{1,3}\s?TUN\s?\d{1,4}$', caseSensitive: false);
                   if (!tunisianPlateRegex.hasMatch(value.trim())) {
-                    return 'Please enter a valid Tunisian license plate format';
+                    return 'Format tunisien requis: XXX TUN XXXX';
                   }
                   return null;
                 },
@@ -172,7 +174,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
               // Make
               const Text(
-                'Make',
+                'Marque',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -183,7 +185,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
               TextFormField(
                 controller: _makeController,
                 decoration: InputDecoration(
-                  hintText: 'e.g., Toyota',
+                  hintText: 'Ex: Toyota',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -192,7 +194,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Make is required';
+                    return 'La marque est requise';
                   }
                   return null;
                 },
@@ -201,7 +203,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
               // Model
               const Text(
-                'Model',
+                'Modèle',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -212,7 +214,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
               TextFormField(
                 controller: _modelController,
                 decoration: InputDecoration(
-                  hintText: 'e.g., Corolla',
+                  hintText: 'Ex: Corolla',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -221,7 +223,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Model is required';
+                    return 'Le modèle est requis';
                   }
                   return null;
                 },
@@ -230,7 +232,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
               // Year
               const Text(
-                'Year',
+                'Année',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -242,7 +244,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 controller: _yearController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  hintText: 'e.g., 2020',
+                  hintText: 'Ex: 2020',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -251,15 +253,15 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Year is required';
+                    return 'L\'année est requise';
                   }
                   final year = int.tryParse(value.trim());
                   if (year == null) {
-                    return 'Please enter a valid year';
+                    return 'Veuillez entrer une année valide';
                   }
                   final currentYear = DateTime.now().year + 1;
                   if (year < 1900 || year > currentYear) {
-                    return 'Please enter a valid year';
+                    return 'Veuillez entrer une année valide';
                   }
                   return null;
                 },
@@ -268,7 +270,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
               // Color
               const Text(
-                'Color',
+                'Couleur',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -298,7 +300,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please select a color';
+                    return 'Veuillez sélectionner une couleur';
                   }
                   return null;
                 },
@@ -320,7 +322,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
-                          widget.vehicle != null ? 'Update Vehicle' : 'Add Vehicle',
+                          widget.vehicle != null ? 'Modifier' : 'Ajouter',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

@@ -50,7 +50,7 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
         Navigator.of(context).pop(true); // Return success
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Phone number added successfully!'),
+            content: Text('Numéro de téléphone ajouté avec succès !'),
             backgroundColor: Colors.green,
           ),
         );
@@ -58,7 +58,7 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to update phone number. Please try again.'),
+              content: Text('Échec de la mise à jour. Veuillez réessayer.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -86,7 +86,7 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text(
-        'Complete Your Profile',
+        'Complétez votre profil',
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.blue,
@@ -99,15 +99,15 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Please add your phone number to complete your profile. This helps us send you important parking notifications.',
+              'Veuillez ajouter votre numéro de téléphone pour compléter votre profil. Cela nous aide à vous envoyer des notifications importantes.',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                hintText: '+1 234 567 8900',
+                labelText: 'Numéro de téléphone',
+                hintText: '+216 XX XXX XXX',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone),
               ),
@@ -122,7 +122,7 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Skip for now'),
+          child: const Text('Passer'),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submitPhoneNumber,

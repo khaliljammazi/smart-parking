@@ -7,6 +7,7 @@ import 'admin_service.dart';
 import 'manage_users_page.dart';
 import 'manage_admins_page.dart';
 import 'admin_qr_scan_page.dart';
+import 'reports_page.dart';
 import '../parkinglist/parking_list_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -62,7 +63,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         backgroundColor: AppColor.navy,
         elevation: 0,
         title: const Text(
-          'Admin Dashboard',
+          'Tableau de bord Admin',
           style: TextStyle(color: Colors.white),
         ),
         actions: [
@@ -83,7 +84,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   children: [
                     // Quick Actions
                     const Text(
-                      'Quick Actions',
+                      'Actions rapides',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -112,7 +113,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     // Revenue Section
                     if (_revenueData != null) ...[
                       const Text(
-                        'Revenue Analytics',
+                      'Analyse des revenus',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -147,7 +148,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // QR Scanner - Only for operators and admins who can scan
         if (canScanQR)
           _buildActionCard(
-            'Scan QR Code',
+            'Scanner QR',
             Icons.qr_code_scanner,
             Colors.teal,
             () => Navigator.push(
@@ -158,7 +159,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Manage Users - Only for full admins (not operators)
         if (isFullAdmin)
           _buildActionCard(
-            'Manage Users',
+            'Gérer les utilisateurs',
             Icons.people,
             Colors.blue,
             () => Navigator.push(
@@ -169,7 +170,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Manage Parkings - Only for full admins
         if (isFullAdmin)
           _buildActionCard(
-            'Manage Parkings',
+            'Gérer les parkings',
             Icons.local_parking,
             Colors.green,
             () => Navigator.push(
@@ -180,7 +181,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Manage Admins - Only for super admins
         if (isSuperAdmin)
           _buildActionCard(
-            'Manage Admins',
+            'Gérer les admins',
             Icons.admin_panel_settings,
             Colors.purple,
             () => Navigator.push(
@@ -190,9 +191,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         // View Reports - Only for full admins
         if (isFullAdmin)
-          _buildActionCard('View Reports', Icons.analytics, Colors.orange, () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Reports feature coming soon')),
+          _buildActionCard('Voir les rapports', Icons.analytics, Colors.orange, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ReportsPage()),
             );
           }),
       ],
@@ -243,25 +245,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       mainAxisSpacing: 16,
       children: [
         _buildStatCard(
-          'Total Users',
+          'Total utilisateurs',
           statistics['totalUsers']?.toString() ?? '0',
           Icons.people,
           Colors.blue,
         ),
         _buildStatCard(
-          'Total Parkings',
+          'Total parkings',
           statistics['totalParkings']?.toString() ?? '0',
           Icons.local_parking,
           Colors.green,
         ),
         _buildStatCard(
-          'Total Bookings',
+          'Total réservations',
           statistics['totalBookings']?.toString() ?? '0',
           Icons.book_online,
           Colors.orange,
         ),
         _buildStatCard(
-          'Active Bookings',
+          'Réservations actives',
           statistics['activeBookings']?.toString() ?? '0',
           Icons.access_time,
           Colors.red,
@@ -320,7 +322,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Revenue Summary',
+              'Résumé des revenus',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -332,7 +334,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               children: [
                 Expanded(
                   child: _buildRevenueItem(
-                    'Total Revenue',
+                    'Revenu total',
                     '${summary['totalRevenue']?.toStringAsFixed(2) ?? '0'} DT',
                     Icons.attach_money,
                     Colors.green,
@@ -341,7 +343,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildRevenueItem(
-                    'Avg per Booking',
+                    'Moy. par réservation',
                     '${summary['averageRevenue']?.toStringAsFixed(2) ?? '0'} DT',
                     Icons.trending_up,
                     Colors.blue,
@@ -354,7 +356,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               children: [
                 Expanded(
                   child: _buildRevenueItem(
-                    'Total Bookings',
+                    'Total réservations',
                     summary['totalBookings']?.toString() ?? '0',
                     Icons.receipt,
                     Colors.orange,
@@ -363,7 +365,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildRevenueItem(
-                    'Period',
+                    'Période',
                     _formatPeriod(summary['period']),
                     Icons.calendar_today,
                     Colors.grey,
@@ -422,7 +424,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Revenue by Parking',
+              'Revenus par parking',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -434,7 +436,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(16),
-                  child: Text('No revenue data available'),
+                  child: Text('Aucune donnée de revenu disponible'),
                 ),
               )
             else
@@ -452,8 +454,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         style: const TextStyle(color: Colors.white),
                       ),
                     ),
-                    title: Text(parking['name'] ?? 'Unknown Parking'),
-                    subtitle: Text('${parking['bookingCount']} bookings'),
+                    title: Text(parking['name'] ?? 'Parking inconnu'),
+                    subtitle: Text('${parking['bookingCount']} réservations'),
                     trailing: Text(
                       '${parking['totalRevenue']?.toStringAsFixed(2) ?? '0'} DT',
                       style: const TextStyle(

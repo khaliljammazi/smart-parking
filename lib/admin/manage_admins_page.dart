@@ -43,18 +43,18 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Create New Admin'),
+        title: const Text('Créer un nouvel admin'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: firstNameController,
-                decoration: const InputDecoration(labelText: 'First Name'),
+                decoration: const InputDecoration(labelText: 'Prénom'),
               ),
               TextField(
                 controller: lastNameController,
-                decoration: const InputDecoration(labelText: 'Last Name'),
+                decoration: const InputDecoration(labelText: 'Nom'),
               ),
               TextField(
                 controller: emailController,
@@ -63,23 +63,23 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
               ),
               TextField(
                 controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone'),
+                decoration: const InputDecoration(labelText: 'Téléphone'),
                 keyboardType: TextInputType.phone,
               ),
               TextField(
                 controller: passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
+                decoration: const InputDecoration(labelText: 'Mot de passe'),
                 obscureText: true,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedRole,
-                decoration: const InputDecoration(labelText: 'Role'),
+                decoration: const InputDecoration(labelText: 'Rôle'),
                 items: const [
                   DropdownMenuItem(value: 'admin', child: Text('Admin')),
                   DropdownMenuItem(
                     value: 'parking_operator',
-                    child: Text('Parking Operator'),
+                    child: Text('Opérateur Parking'),
                   ),
                 ],
                 onChanged: (value) {
@@ -92,7 +92,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Annuler'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -102,7 +102,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                   phoneController.text.isEmpty ||
                   passwordController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please fill all fields')),
+                  const SnackBar(content: Text('Veuillez remplir tous les champs')),
                 );
                 return;
               }
@@ -120,7 +120,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                 Navigator.pop(context, success);
               }
             },
-            child: const Text('Create'),
+            child: const Text('Créer'),
           ),
         ],
       ),
@@ -129,7 +129,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     if (result == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Admin created successfully'),
+          content: Text('Admin créé avec succès'),
           backgroundColor: Colors.green,
         ),
       );
@@ -141,17 +141,17 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: Text('Are you sure you want to delete admin: $userName?'),
+        title: const Text('Confirmer la suppression'),
+        content: Text('Êtes-vous sûr de vouloir supprimer l\'admin : $userName ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Supprimer'),
           ),
         ],
       ),
@@ -163,7 +163,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              success ? 'Admin deleted successfully' : 'Failed to delete admin',
+              success ? 'Admin supprimé avec succès' : 'Échec de la suppression',
             ),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
@@ -180,7 +180,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       appBar: AppBar(
         backgroundColor: AppColor.navy,
         title: const Text(
-          'Manage Admins',
+          'Gérer les admins',
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -194,7 +194,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _admins.isEmpty
-          ? const Center(child: Text('No admin users found'))
+          ? const Center(child: Text('Aucun admin trouvé'))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _admins.length,
@@ -255,7 +255,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         onPressed: _showCreateAdminDialog,
         backgroundColor: AppColor.navy,
         icon: const Icon(Icons.add),
-        label: const Text('Add Admin'),
+        label: const Text('Ajouter Admin'),
       ),
     );
   }
@@ -291,11 +291,11 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       case 'super_admin':
         return 'Super Admin';
       case 'parking_operator':
-        return 'Parking Operator';
+        return 'Opérateur Parking';
       case 'admin':
         return 'Admin';
       default:
-        return 'User';
+        return 'Utilisateur';
     }
   }
 }

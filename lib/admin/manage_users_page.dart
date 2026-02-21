@@ -43,17 +43,17 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: Text('Are you sure you want to delete user: $userName?'),
+        title: const Text('Confirmer la suppression'),
+        content: Text('Êtes-vous sûr de vouloir supprimer l\'utilisateur : $userName ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Supprimer'),
           ),
         ],
       ),
@@ -65,7 +65,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              success ? 'User deleted successfully' : 'Failed to delete user',
+              success ? 'Utilisateur supprimé avec succès' : 'Échec de la suppression',
             ),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
@@ -82,7 +82,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     if (currentUserRole != 'super_admin') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only Super Admin can change user roles'),
+          content: Text('Seul le Super Admin peut changer les rôles'),
           backgroundColor: Colors.red,
         ),
       );
@@ -94,11 +94,11 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text('Change Role for $userName'),
+          title: Text('Changer le rôle de $userName'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Select new role:'),
+              const Text('Sélectionner le nouveau rôle :'),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedRole,
@@ -107,8 +107,8 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'user', child: Text('User')),
-                  DropdownMenuItem(value: 'parking_operator', child: Text('Parking Operator')),
+                  DropdownMenuItem(value: 'user', child: Text('Utilisateur')),
+                  DropdownMenuItem(value: 'parking_operator', child: Text('Opérateur Parking')),
                   DropdownMenuItem(value: 'admin', child: Text('Admin')),
                   DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
                 ],
@@ -123,7 +123,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Annuler'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, selectedRole),
@@ -131,7 +131,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                 backgroundColor: AppColor.navy,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Update Role'),
+              child: const Text('Mettre à jour'),
             ),
           ],
         ),
@@ -144,7 +144,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              success ? 'User role updated successfully' : 'Failed to update user role',
+              success ? 'Rôle mis à jour avec succès' : 'Échec de la mise à jour du rôle',
             ),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
@@ -161,7 +161,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
       appBar: AppBar(
         backgroundColor: AppColor.navy,
         title: const Text(
-          'Manage Users',
+          'Gérer les utilisateurs',
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -177,7 +177,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search by name or email...',
+                    hintText: 'Rechercher par nom ou email...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -199,7 +199,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                       child: DropdownButtonFormField<String>(
                         value: _selectedRole,
                         decoration: InputDecoration(
-                          labelText: 'Filter by Role',
+                          labelText: 'Filtrer par rôle',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -207,12 +207,12 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                         items: const [
                           DropdownMenuItem(
                             value: null,
-                            child: Text('All Roles'),
+                            child: Text('Tous les rôles'),
                           ),
-                          DropdownMenuItem(value: 'user', child: Text('User')),
+                          DropdownMenuItem(value: 'user', child: Text('Utilisateur')),
                           DropdownMenuItem(
                             value: 'parking_operator',
-                            child: Text('Parking Operator'),
+                            child: Text('Opérateur Parking'),
                           ),
                           DropdownMenuItem(
                             value: 'admin',
@@ -229,7 +229,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                     ElevatedButton.icon(
                       onPressed: _loadUsers,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Refresh'),
+                      label: const Text('Actualiser'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColor.navy,
                         foregroundColor: Colors.white,
@@ -250,7 +250,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _users.isEmpty
-                ? const Center(child: Text('No users found'))
+                ? const Center(child: Text('Aucun utilisateur trouvé'))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _users.length,
@@ -314,7 +314,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                                         user['role'] ?? 'user',
                                         '${user['firstName']} ${user['lastName']}',
                                       ),
-                                      tooltip: 'Change Role',
+                                      tooltip: 'Changer le rôle',
                                     );
                                   }
                                   return const SizedBox.shrink();
@@ -331,7 +331,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                                     user['_id'],
                                     '${user['firstName']} ${user['lastName']}',
                                   ),
-                                  tooltip: 'Delete User',
+                                  tooltip: 'Supprimer',
                                 ),
                             ],
                           ),
@@ -363,11 +363,11 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
       case 'super_admin':
         return 'Super Admin';
       case 'parking_operator':
-        return 'Parking Operator';
+        return 'Opérateur Parking';
       case 'admin':
         return 'Admin';
       default:
-        return 'User';
+        return 'Utilisateur';
     }
   }
 

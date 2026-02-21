@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'profile_header.dart';
 import 'profile_menu.dart';
-import '../../wallet/wallet_page.dart';
-import '../../vehicle/vehicle_page.dart';
 import '../../authentication/auth_provider.dart';
 import '../profile_edit_page.dart';
 import '../../booking/booking_history_page.dart';
@@ -45,10 +43,6 @@ class ProfileBody extends StatelessWidget {
           const SizedBox(height: 18),
           const ProfileHeader(),
           const ProfileMenu(iconData: Icons.person, textData: 'Informations Personnelles', page: ProfilePage()),
-          const Divider(height: 8),
-          const ProfileMenu(iconData: Icons.directions_car_sharp, textData: 'Gérer les Véhicules', page: VehiclePage()),
-          const Divider(height: 8),
-          const ProfileMenu(iconData: Icons.wallet, textData: 'Portefeuille', page: WalletPage()),
           const Divider(height: 8),
           const ProfileMenu(iconData: Icons.history, textData: 'Historique des Réservations', page: BookingHistoryPage()),
           const Divider(height: 8),

@@ -7,6 +7,7 @@ import '../utils/constanst.dart';
 import '../utils/role_helper.dart';
 import '../model/parking_model.dart';
 import '../authentication/auth_provider.dart';
+import 'admin_service.dart';
 import 'parking_form_page.dart';
 
 class AdminQRScanPage extends StatefulWidget {
@@ -16,9 +17,10 @@ class AdminQRScanPage extends StatefulWidget {
   State<AdminQRScanPage> createState() => _AdminQRScanPageState();
 }
 
-class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProviderStateMixin {
+class _AdminQRScanPageState extends State<AdminQRScanPage>
+    with TickerProviderStateMixin {
   bool _isProcessing = false;
-  late TabController _tabController;
+  TabController? _tabController;
   String? _userRole;
 
   // Dashboard data
@@ -36,20 +38,23 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final role = authProvider.userProfile?['role'];
-      setState(() {
-        _userRole = role;
-        // Operators only see Scanner tab, Full admins see both
-        final tabCount = RoleHelper.isFullAdmin(role) ? 2 : 1;
-        _tabController = TabController(length: tabCount, vsync: this);
-      });
+      if (mounted) {
+        setState(() {
+          _userRole = role;
+          // Both admins and operators get dashboard + scanner tabs
+          final showTabs =
+              RoleHelper.isFullAdmin(role) || role == 'parking_operator';
+          final tabCount = showTabs ? 2 : 1;
+          _tabController = TabController(length: tabCount, vsync: this);
+        });
+      }
     });
-    _tabController = TabController(length: 2, vsync: this);
     _loadDashboardData();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -87,7 +92,9 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
   void _editParking(ParkingModel parking) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => ParkingFormPage(parking: parking)),
+      MaterialPageRoute(
+        builder: (context) => ParkingFormPage(parking: parking),
+      ),
     );
     if (result == true) {
       _loadDashboardData();
@@ -114,12 +121,12 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
     );
 
     if (confirm == true) {
-      final success = await BackendApi.deleteParking(parking.id);
+      final success = await AdminService.deleteParking(parking.id);
       if (success) {
         _loadDashboardData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Parking supprimé')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Parking supprimé')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Erreur lors de la suppression')),
@@ -143,7 +150,9 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
             // Show validation success
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Booking validated successfully!\nUser: ${result['user']?['name'] ?? 'Unknown'}\nVehicle: ${result['vehicle']?['licensePlate'] ?? 'No vehicle'}'),
+                content: Text(
+                  'Réservation validée avec succès !\nClient : ${result['user']?['name'] ?? 'Inconnu'}\nVéhicule : ${result['vehicle']?['licensePlate'] ?? 'Aucun'}',
+                ),
                 backgroundColor: Colors.green,
               ),
             );
@@ -152,7 +161,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Invalid or expired QR code'),
+                  content: Text('QR code invalide ou expiré'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -162,7 +171,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error validating booking: $e'),
+                content: Text('Erreur de validation : $e'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -176,30 +185,53 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final isFullAdmin = RoleHelper.isFullAdmin(_userRole);
-    
+    final isOperator = _userRole == 'parking_operator';
+    final showTabs = isFullAdmin || isOperator;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(isFullAdmin ? 'Admin Panel' : 'QR Scanner'),
+        title: Text(
+          isFullAdmin
+              ? 'Panneau Admin'
+              : isOperator
+              ? 'Panneau Opérateur'
+              : 'Scanner QR',
+        ),
         backgroundColor: AppColor.navy,
-        bottom: isFullAdmin 
-          ? TabBar(
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Déconnexion',
+            onPressed: () {
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
+              authProvider.logout();
+            },
+          ),
+        ],
+        bottom: showTabs && _tabController != null
+            ? TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.white,
+                tabs: const [
+                  Tab(text: 'Tableau de bord'),
+                  Tab(text: 'Scanner'),
+                ],
+              )
+            : null,
+      ),
+      body: showTabs && _tabController != null
+          ? TabBarView(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'Dashboard'),
-                Tab(text: 'Scanner'),
+              children: [
+                isOperator ? _buildOperatorDashboard() : _buildDashboard(),
+                _buildScanner(),
               ],
             )
-          : null,
-      ),
-      body: isFullAdmin 
-        ? TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDashboard(),
-              _buildScanner(),
-            ],
-          )
-        : _buildScanner(), // Operators only see scanner
+          : _buildScanner(),
     );
   }
 
@@ -215,7 +247,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Dashboard',
+              'Tableau de bord',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
@@ -223,7 +255,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
               children: [
                 Expanded(
                   child: _buildMetricCard(
-                    'Total Spots',
+                    'Places totales',
                     _totalSpots.toString(),
                     Icons.local_parking,
                     Colors.blue,
@@ -232,7 +264,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildMetricCard(
-                    'Available Spots',
+                    'Places disponibles',
                     _availableSpots.toString(),
                     Icons.check_circle,
                     Colors.green,
@@ -245,7 +277,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
               children: [
                 Expanded(
                   child: _buildMetricCard(
-                    'Taken Spots',
+                    'Places occupées',
                     _takenSpots.toString(),
                     Icons.cancel,
                     Colors.red,
@@ -254,7 +286,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildMetricCard(
-                    'Turnover',
+                    'Chiffre d\'affaires',
                     '${_turnover.toStringAsFixed(2)} DT',
                     Icons.attach_money,
                     Colors.orange,
@@ -264,7 +296,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
             ),
             const SizedBox(height: 20),
             const Text(
-              'Parking Places',
+              'Parkings',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -276,7 +308,10 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
-                      leading: const Icon(Icons.local_parking, color: AppColor.navy),
+                      leading: const Icon(
+                        Icons.local_parking,
+                        color: AppColor.navy,
+                      ),
                       title: Text(parking.name),
                       subtitle: Text(parking.address),
                       trailing: Row(
@@ -300,7 +335,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _loadDashboardData,
-              child: const Text('Refresh'),
+              child: const Text('Actualiser'),
             ),
           ],
         ),
@@ -313,7 +348,166 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+  Widget _buildOperatorDashboard() {
+    if (_isLoadingDashboard) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Calculate today's expected arrivals (active bookings = expected arrivals)
+    final expectedArrivals = _takenSpots;
+
+    return RefreshIndicator(
+      onRefresh: () async => _loadDashboardData(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tableau de bord Opérateur',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            // Key metrics for operator
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    'Arrivées prévues',
+                    expectedArrivals.toString(),
+                    Icons.people_alt,
+                    Colors.purple,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildMetricCard(
+                    'Places libres',
+                    _availableSpots.toString(),
+                    Icons.event_available,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    'Places occupées',
+                    _takenSpots.toString(),
+                    Icons.event_busy,
+                    Colors.red,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildMetricCard(
+                    'Total places',
+                    _totalSpots.toString(),
+                    Icons.local_parking,
+                    Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Occupancy rate
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Taux d\'occupation',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: _totalSpots > 0 ? _takenSpots / _totalSpots : 0,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        (_totalSpots > 0 ? _takenSpots / _totalSpots : 0) > 0.8
+                            ? Colors.red
+                            : (_totalSpots > 0
+                                      ? _takenSpots / _totalSpots
+                                      : 0) >
+                                  0.5
+                            ? Colors.orange
+                            : Colors.green,
+                      ),
+                      minHeight: 12,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_totalSpots > 0 ? (_takenSpots / _totalSpots * 100).toStringAsFixed(1) : 0}% occupé',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Parking list for operator view
+            const Text(
+              'Détails des parkings',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ..._parkings.map(
+              (parking) => Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: parking.availableSpots > 0
+                        ? Colors.green
+                        : Colors.red,
+                    child: Icon(
+                      parking.availableSpots > 0 ? Icons.check : Icons.close,
+                      color: Colors.white,
+                    ),
+                  ),
+                  title: Text(parking.name),
+                  subtitle: Text(parking.address),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${parking.availableSpots}/${parking.totalSpots}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Text('disponibles', style: TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
       child: Padding(
@@ -341,13 +535,9 @@ class _AdminQRScanPageState extends State<AdminQRScanPage> with SingleTickerProv
   Widget _buildScanner() {
     return Stack(
       children: [
-        MobileScanner(
-          onDetect: _onDetect,
-        ),
+        MobileScanner(onDetect: _onDetect),
         if (_isProcessing)
-          const Center(
-            child: CircularProgressIndicator(),
-          )
+          const Center(child: CircularProgressIndicator())
         else
           Align(
             alignment: Alignment.bottomCenter,

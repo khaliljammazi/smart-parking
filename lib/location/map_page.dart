@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 import '../utils/favorites_provider.dart';
+import '../utils/backend_api.dart';
+import '../parkinglist/parking_detail_page.dart';
 
 class MapPage extends StatefulWidget {
   final Function(double lat, double lng)? onLocationSelected;
@@ -22,6 +24,10 @@ class _MapPageState extends State<MapPage> {
   final List<Marker> _markers = [];
   final List<CircleMarker> _circles = [];
 
+  // Real parking data from backend
+  List<ParkingModel> _parkings = [];
+  bool _isParkingsLoading = true;
+
   // GPS related variables
   Position? _currentPosition;
   bool _isLocationLoading = false;
@@ -36,7 +42,7 @@ class _MapPageState extends State<MapPage> {
   @override
   void initState() {
     super.initState();
-    _addParkingMarkers();
+    _loadParkings();
     _addSearchRadius();
     _initializeLocation();
   }
@@ -48,17 +54,38 @@ class _MapPageState extends State<MapPage> {
     super.dispose();
   }
 
+  Future<void> _loadParkings() async {
+    try {
+      final parkings = await BackendApi.getAllParkingSpots();
+      if (mounted) {
+        setState(() {
+          _parkings = parkings;
+          _isParkingsLoading = false;
+        });
+        _addParkingMarkers();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isParkingsLoading = false);
+      }
+    }
+  }
+
   void _addParkingMarkers() {
-    for (final parking in mockParkingSpots) {
+    // Remove old parking markers (keep user location marker)
+    _markers.removeWhere((marker) =>
+      marker.child is GestureDetector);
+
+    for (final parking in _parkings) {
       final marker = Marker(
         width: 40,
         height: 40,
         point: LatLng(parking.latitude, parking.longitude),
         child: GestureDetector(
           onTap: () => _showParkingDetails(parking),
-          child: const Icon(
+          child: Icon(
             Icons.location_on,
-            color: Colors.blue,
+            color: parking.isOpen ? Colors.blue : Colors.grey,
             size: 40,
           ),
         ),
@@ -79,7 +106,7 @@ class _MapPageState extends State<MapPage> {
     _circles.add(circle);
   }
 
-  void _showParkingDetails(ParkingSpot parking) {
+  void _showParkingDetails(ParkingModel parking) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -88,7 +115,7 @@ class _MapPageState extends State<MapPage> {
       ),
       builder: (context) {
         final favoritesProvider = Provider.of<FavoritesProvider>(context);
-        final isFavorite = favoritesProvider.isFavorite(parking.id.toString());
+        final isFavorite = favoritesProvider.isFavorite(parking.id);
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -115,7 +142,7 @@ class _MapPageState extends State<MapPage> {
                       size: 28,
                     ),
                     onPressed: () {
-                      favoritesProvider.toggleFavorite(parking.id.toString());
+                      favoritesProvider.toggleFavorite(parking.id);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -153,18 +180,40 @@ class _MapPageState extends State<MapPage> {
                   Text('${parking.availableSpots} places'),
                 ],
               ),
+              const SizedBox(height: 8),
+              // Open/Closed status
+              Row(
+                children: [
+                  Icon(
+                    parking.isOpen ? Icons.check_circle : Icons.cancel,
+                    color: parking.isOpen ? Colors.green : Colors.red,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    parking.isOpen ? 'Ouvert' : 'Fermé',
+                    style: TextStyle(
+                      color: parking.isOpen ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: parking.isOpen ? () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Réservation pour ${parking.name}')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ParkingDetailPage(parking: parking),
+                      ),
                     );
-                  },
+                  } : null,
                   icon: const Icon(Icons.calendar_today),
-                  label: const Text('Réserver'),
+                  label: Text(parking.isOpen ? 'Réserver' : 'Indisponible'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColor.navy,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -408,27 +457,64 @@ class _MapPageState extends State<MapPage> {
           ),
         ],
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: _initialCenter,
-          initialZoom: _initialZoom,
-          minZoom: 5,
-          maxZoom: 18,
-          onTap: widget.onLocationSelected != null ? _onMapTap : null,
-        ),
+      body: Stack(
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.smartparking.app',
-            maxZoom: 19,
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _initialCenter,
+              initialZoom: _initialZoom,
+              minZoom: 5,
+              maxZoom: 18,
+              onTap: widget.onLocationSelected != null ? _onMapTap : null,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.smartparking.app',
+                maxZoom: 19,
+              ),
+              CircleLayer(
+                circles: _circles,
+              ),
+              MarkerLayer(
+                markers: _getAllMarkers(),
+              ),
+            ],
           ),
-          CircleLayer(
-            circles: _circles,
-          ),
-          MarkerLayer(
-            markers: _getAllMarkers(),
-          ),
+          if (_isParkingsLoading)
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Chargement des parkings...'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: widget.onLocationSelected != null

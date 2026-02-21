@@ -16,6 +16,7 @@ const bookingRoutes = require('./src/routes/booking');
 const vehicleRoutes = require('./src/routes/vehicle');
 const adminRoutes = require('./src/routes/admin');
 const qrRoutes = require('./src/routes/qr');
+const notificationRoutes = require('./src/routes/notification');
 
 // Middleware
 app.use(helmet());
@@ -47,6 +48,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/qr', qrRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
