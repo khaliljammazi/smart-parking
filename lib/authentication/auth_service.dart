@@ -246,4 +246,63 @@ class AuthService {
       return {'success': false, 'message': 'Network error. Please try again.'};
     }
   }
+  // Register user
+  static Future<Map<String, dynamic>?> register(Map<String, dynamic> userData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/register'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(userData),
+      );
+
+      return json.decode(response.body);
+    } catch (e) {
+      print('Error registering: $e');
+      return {'success': false, 'message': 'Network error. Please try again.'};
+    }
+  }
+
+  // Verify email with OTP
+  static Future<Map<String, dynamic>?> verifyEmail(String email, String otp) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/verify-email'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+          'otp': otp,
+        }),
+      );
+
+      return json.decode(response.body);
+    } catch (e) {
+      print('Error verifying email: $e');
+      return {'success': false, 'message': 'Network error. Please try again.'};
+    }
+  }
+
+  // Resend verification email
+  static Future<Map<String, dynamic>?> resendVerificationEmail() async {
+    try {
+      final token = await getToken();
+      if (token == null) return {'success': false, 'message': 'Not authenticated'};
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/send-verify-email'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return json.decode(response.body);
+    } catch (e) {
+      print('Error resending verification email: $e');
+      return {'success': false, 'message': 'Network error. Please try again.'};
+    }
+  }
 }

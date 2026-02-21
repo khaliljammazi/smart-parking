@@ -429,6 +429,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: _isLoading ? null : _handleEmailLogin,
@@ -496,6 +497,30 @@ class _LoginPageState extends State<LoginPage> {
                   ],
 
                   const SizedBox(height: 32),
+
+                  // Sign Up Link (Always visible)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Don't have an account? ",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/signup');
+                        },
+                        child: const Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   // Terms and Privacy
                   const Text(
