@@ -89,6 +89,13 @@ router.post('/register', registerValidation, async (req, res) => {
 
     await user.save();
 
+    // Generate OTP for email verification
+    const emailOtp = generateOTP();
+    user.emailVerificationToken = crypto.createHash('sha256').update(emailOtp).digest('hex');
+    user.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    await user.save();
+
     // Generate token
     const token = user.generateAuthToken();
 
@@ -97,9 +104,24 @@ router.post('/register', registerValidation, async (req, res) => {
     user.loginCount += 1;
     await user.save();
 
+    // Send verification email
+    try {
+      if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+        await transporter.sendMail({
+          from: process.env.GMAIL_USER,
+          to: user.email,
+          subject: 'Verify Your Email - Smart Parking',
+          text: `Your verification code is: ${emailOtp}. It expires in 10 minutes.`,
+          html: `<p>Your verification code is: <strong>${emailOtp}</strong></p><p>It expires in 10 minutes.</p>`
+        });
+      }
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
+
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: 'User registered successfully. Please check your email for verification code.',
       data: {
         user: {
           id: user._id,
@@ -322,6 +344,164 @@ router.post('/logout', protect, (req, res) => {
     success: true,
     message: 'Logged out successfully'
   });
+});
+
+// @route   POST /api/auth/send-verify-email
+// @desc    Send verification email
+// @access  Private
+router.post('/send-verify-email', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (user.isVerified) {
+      return res.status(400).json({ success: false, message: 'Email already verified' });
+    }
+
+    const otp = generateOTP();
+    user.emailVerificationToken = crypto.createHash('sha256').update(otp).digest('hex');
+    user.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: user.email,
+        subject: 'Verify Your Email - Smart Parking',
+        text: `Your verification code is: ${otp}. It expires in 10 minutes.`,
+        html: `<p>Your verification code is: <strong>${otp}</strong></p><p>It expires in 10 minutes.</p>`
+      });
+    }
+
+    res.json({ success: true, message: 'Verification email sent' });
+  } catch (error) {
+    console.error('Send verify email error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/auth/verify-email
+// @desc    Verify email with OTP
+// @access  Public
+router.post('/verify-email', [
+  body('email').isEmail().normalizeEmail(),
+  body('otp').notEmpty()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, otp } = req.body;
+
+  try {
+    // Hash the OTP to compare with stored hash
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    const user = await User.findOne({
+      email,
+      emailVerificationToken: hashedOtp,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    user.isVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    const token = user.generateAuthToken();
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      data: { token, user: { id: user._id, email: user.email, isVerified: true } }
+    });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/auth/forgot-password
+// @desc    Forgot password (send OTP)
+// @access  Public
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const otp = generateOTP();
+    user.passwordResetToken = crypto.createHash('sha256').update(otp).digest('hex');
+    user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: user.email,
+        subject: 'Reset Password - Smart Parking',
+        text: `Your password reset code is: ${otp}. It expires in 10 minutes.`,
+        html: `<p>Your password reset code is: <strong>${otp}</strong></p><p>It expires in 10 minutes.</p>`
+      });
+    }
+
+    res.json({ success: true, message: 'Password reset code sent to email' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password
+// @access  Public
+router.post('/reset-password', [
+  body('email').isEmail().normalizeEmail(),
+  body('otp').notEmpty(),
+  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    const user = await User.findOne({
+      email,
+      passwordResetToken: hashedOtp,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 module.exports = router;

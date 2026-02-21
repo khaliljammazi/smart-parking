@@ -130,4 +130,60 @@ class AuthProvider with ChangeNotifier {
 
     return response.statusCode == 200;
   }
+
+  Future<Map<String, dynamic>?> register(Map<String, dynamic> userData) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final result = await AuthService.register(userData);
+      
+      if (result != null && result['success'] == true) {
+        final token = result['data']?['token'];
+        if (token != null) {
+          await setAuthenticated(token);
+        }
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': 'Registration error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>?> verifyEmail(String email, String otp) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final result = await AuthService.verifyEmail(email, otp);
+      
+      if (result != null && result['success'] == true) {
+        final token = result['data']?['token'];
+        if (token != null) {
+          await setAuthenticated(token);
+        }
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'message': 'Verification error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>?> resendVerificationEmail() async {
+    try {
+      return await AuthService.resendVerificationEmail();
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
+    }
+  }
 }
