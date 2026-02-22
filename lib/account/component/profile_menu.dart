@@ -5,13 +5,14 @@ class ProfileMenu extends StatelessWidget {
   final String textData;
   final IconData iconData;
   final Widget? page;
+  final VoidCallback? onTapOverride;
 
-  const ProfileMenu({super.key, required this.textData, required this.iconData, this.page});
+  const ProfileMenu({super.key, required this.textData, required this.iconData, this.page, this.onTapOverride});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: page != null
+      onTap: onTapOverride ?? (page != null
           ? () {
               Navigator.push(
                 context,
@@ -22,7 +23,7 @@ class ProfileMenu extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('$textData - Bientôt disponible')),
               );
-            },
+            }),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: SizedBox(

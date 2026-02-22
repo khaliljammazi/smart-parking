@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 import '../utils/favorites_provider.dart';
+import '../utils/role_helper.dart';
+import '../authentication/auth_provider.dart';
 import '../booking/booking_service.dart';
 import '../booking/qr_code_dialog.dart';
 import '../notification/backend_notification_service.dart';
@@ -392,7 +394,8 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Reserve Button
+                  // Reserve Button (only for normal users, not admins)
+                  if (!RoleHelper.isAdmin(Provider.of<AuthProvider>(context, listen: false).userProfile?['role']))
                   SizedBox(
                     width: double.infinity,
                     height: 56,

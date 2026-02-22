@@ -177,6 +177,33 @@ class AuthService {
     }
   }
 
+  // Upload avatar image
+  static Future<String?> uploadAvatar(String filePath) async {
+    try {
+      final token = await getToken();
+      if (token == null) return null;
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/users/avatar'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(await http.MultipartFile.fromPath('avatar', filePath));
+
+      final streamResponse = await request.send();
+      final response = await http.Response.fromStream(streamResponse);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data']?['avatar'];
+      }
+      return null;
+    } catch (e) {
+      print('Error uploading avatar: $e');
+      return null;
+    }
+  }
+
   // Login with email and password
   static Future<Map<String, dynamic>?> loginWithEmail(String email, String password) async {
     try {

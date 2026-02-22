@@ -9,6 +9,7 @@ import 'manage_admins_page.dart';
 import 'admin_qr_scan_page.dart';
 import 'reports_page.dart';
 import '../parkinglist/parking_list_page.dart';
+import '../vehicle/vehicle_management_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -69,7 +70,33 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => authProvider.logout(),
+            onPressed: () async {
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Déconnexion'),
+                  content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Annuler'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Déconnexion'),
+                    ),
+                  ],
+                ),
+              );
+              if (shouldLogout == true && context.mounted) {
+                await authProvider.logout();
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
+            },
           ),
         ],
       ),
@@ -197,6 +224,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               MaterialPageRoute(builder: (context) => const ReportsPage()),
             );
           }),
+        // Manage Vehicles - For admins
+        if (isFullAdmin)
+          _buildActionCard(
+            'Gérer les véhicules',
+            Icons.directions_car,
+            Colors.indigo,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const VehicleManagementPage()),
+            ),
+          ),
       ],
     );
   }

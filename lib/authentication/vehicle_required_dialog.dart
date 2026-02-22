@@ -24,13 +24,21 @@ class _VehicleRequiredDialogState extends State<VehicleRequiredDialog> {
             size: 28,
           ),
           const SizedBox(width: 12),
-          const Text(
-            'Add Your Vehicle',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColor.navy,
+          const Expanded(
+            child: Text(
+              'Ajoutez votre véhicule',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColor.navy,
+              ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.grey),
+            onPressed: () => Navigator.of(context).pop(false),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -39,7 +47,7 @@ class _VehicleRequiredDialogState extends State<VehicleRequiredDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'To use our parking services, you need to add at least one vehicle to your account.',
+            'Pour utiliser nos services de stationnement, vous devez ajouter au moins un véhicule à votre compte.',
             style: TextStyle(
               fontSize: 16,
               color: Colors.black87,
@@ -48,7 +56,7 @@ class _VehicleRequiredDialogState extends State<VehicleRequiredDialog> {
           ),
           SizedBox(height: 12),
           Text(
-            'This helps us provide personalized parking recommendations and manage your bookings effectively.',
+            'Cela nous aide à fournir des recommandations de parking personnalisées et à gérer vos réservations efficacement.',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey,
@@ -58,6 +66,16 @@ class _VehicleRequiredDialogState extends State<VehicleRequiredDialog> {
         ],
       ),
       actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop(false); // Skip adding vehicle
+          },
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey,
+            textStyle: const TextStyle(fontSize: 14),
+          ),
+          child: const Text('Plus tard'),
+        ),
         TextButton(
           onPressed: () {
             // Navigate to vehicle form
@@ -78,7 +96,7 @@ class _VehicleRequiredDialogState extends State<VehicleRequiredDialog> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          child: const Text('Add Vehicle'),
+          child: const Text('Ajouter un véhicule'),
         ),
       ],
     );

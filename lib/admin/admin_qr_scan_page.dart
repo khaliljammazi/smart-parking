@@ -203,12 +203,36 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Déconnexion',
-            onPressed: () {
-              final authProvider = Provider.of<AuthProvider>(
-                context,
-                listen: false,
+            onPressed: () async {
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Déconnexion'),
+                  content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Annuler'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Déconnexion'),
+                    ),
+                  ],
+                ),
               );
-              authProvider.logout();
+              if (shouldLogout == true && context.mounted) {
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                await authProvider.logout();
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
             },
           ),
         ],

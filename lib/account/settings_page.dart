@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/theme_provider.dart';
 import '../utils/constanst.dart';
 import '../utils/role_helper.dart';
@@ -139,12 +140,7 @@ class _SettingsPageState extends State<SettingsPage> {
             title: languageProvider.locale.languageCode == 'fr'
                 ? 'Nous contacter'
                 : 'Contact Us',
-            onTap: () => _showComingSoon(
-              languageProvider.locale.languageCode == 'fr'
-                  ? 'Contact'
-                  : 'Contact',
-              l10n,
-            ),
+            onTap: () => _showSupportContactDialog(languageProvider),
             isDark: isDark,
           ),
           _buildMenuTile(
@@ -460,6 +456,80 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  void _showSupportContactDialog(LanguageProvider languageProvider) {
+    final isFrench = languageProvider.locale.languageCode == 'fr';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.support_agent, color: Colors.blue.shade700, size: 28),
+            const SizedBox(width: 12),
+            Text(
+              isFrench ? 'Support Client' : 'Customer Support',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isFrench
+                  ? 'Vous pouvez contacter notre support client par mail ou téléphone :'
+                  : 'You can contact our customer support by email or phone:',
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+            const SizedBox(height: 20),
+            InkWell(
+              onTap: () async {
+                final uri = Uri(scheme: 'mailto', path: 'Balssem.Zoghbi@keyrus.com');
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.email, color: Colors.blue.shade700),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Balssem.Zoghbi@keyrus.com',
+                      style: TextStyle(fontSize: 14, color: Colors.blue, decoration: TextDecoration.underline, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async {
+                final uri = Uri(scheme: 'tel', path: '+21629930536');
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.phone, color: Colors.green.shade700),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '+216 29 930 536',
+                    style: TextStyle(fontSize: 14, color: Colors.blue, decoration: TextDecoration.underline, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(isFrench ? 'Fermer' : 'Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showComingSoon(String feature, AppLocalizations l10n) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -470,11 +540,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _handleLogout(AuthProvider authProvider) async {
-    final languageProvider = Provider.of<LanguageProvider>(
-      context,
-      listen: false,
-    );
-    final isFrench = languageProvider.locale.languageCode == 'fr';
     final l10n = context.l10n;
 
     final shouldLogout = await showDialog<bool>(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../utils/constanst.dart';
 import '../authentication/auth_provider.dart';
 import '../authentication/auth_service.dart';
@@ -20,7 +19,9 @@ class _ProfilePageState extends State<ProfilePage> {
   final _phoneController = TextEditingController();
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isUploadingAvatar = false;
   Map<String, dynamic>? _userProfile;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -103,6 +104,79 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _pickAndUploadAvatar() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera, color: AppColor.navy),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColor.navy),
+              title: const Text('Choisir dans la galerie'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedFile = await _imagePicker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+
+    if (pickedFile == null) return;
+
+    setState(() => _isUploadingAvatar = true);
+
+    try {
+      final avatarUrl = await AuthService.uploadAvatar(pickedFile.path);
+      if (avatarUrl != null && mounted) {
+        // Refresh profile
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final token = await authProvider.getToken();
+        if (token != null) {
+          await authProvider.setAuthenticated(token);
+        }
+        await _loadUserProfile();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo de profil mise à jour'), backgroundColor: Colors.green),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Échec de la mise à jour de la photo'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
+  }
+
+  String _getAvatarUrl(String avatar) {
+    if (avatar.startsWith('http')) return avatar;
+    // Relative path from backend
+    final baseUrl = AuthService.baseUrl.replaceAll('/api', '');
+    return '$baseUrl$avatar';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -131,25 +205,30 @@ class _ProfilePageState extends State<ProfilePage> {
                           radius: 60,
                           backgroundColor: Colors.grey[300],
                           backgroundImage: _userProfile?['avatar'] != null
-                              ? NetworkImage(_userProfile!['avatar'])
+                              ? NetworkImage(_getAvatarUrl(_userProfile!['avatar']))
                               : null,
-                          child: _userProfile?['avatar'] == null
-                              ? Text(
-                                  (_userProfile?['firstName']?[0] ?? 'U').toUpperCase(),
-                                  style: const TextStyle(fontSize: 40, color: Colors.white),
-                                )
-                              : null,
+                          child: _isUploadingAvatar
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : _userProfile?['avatar'] == null
+                                  ? Text(
+                                      (_userProfile?['firstName']?[0] ?? 'U').toUpperCase(),
+                                      style: const TextStyle(fontSize: 40, color: Colors.white),
+                                    )
+                                  : null,
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: AppColor.orange,
-                              shape: BoxShape.circle,
+                          child: GestureDetector(
+                            onTap: _pickAndUploadAvatar,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: AppColor.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                           ),
                         ),
                       ],

@@ -154,6 +154,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _hasShownPhoneDialog = false;
   bool _hasShownVehicleDialog = false;
+  bool _hasRedirectedAdmin = false;
 
   @override
   Widget build(BuildContext context) {
@@ -167,16 +168,34 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const LoginPage();
         }
 
-        // Check if user needs to add phone number
-        if (authProvider.needsPhoneNumber && !_hasShownPhoneDialog) {
+        // Check if user is admin/operator and redirect to admin dashboard
+        final userRole = authProvider.userProfile?['role'];
+        if (!_hasRedirectedAdmin &&
+            (userRole == 'admin' ||
+                userRole == 'super_admin' ||
+                userRole == 'parking_operator')) {
+          _hasRedirectedAdmin = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/admin', (route) => false);
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // Check if user needs to add phone number (only for normal users)
+        final isNormalUser = userRole == null || userRole == 'user';
+        if (isNormalUser && authProvider.needsPhoneNumber && !_hasShownPhoneDialog) {
           _hasShownPhoneDialog = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _showPhoneNumberDialog(context);
           });
         }
 
-        // Check if user needs to add vehicles
-        if (authProvider.needsVehicles && !_hasShownVehicleDialog) {
+        // Check if user needs to add vehicles (only for normal users)
+        if (isNormalUser && authProvider.needsVehicles && !_hasShownVehicleDialog) {
           _hasShownVehicleDialog = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _showVehicleRequiredDialog(context);

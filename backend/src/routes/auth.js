@@ -25,6 +25,57 @@ function generateOTP() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
+// Build a professional OTP email template
+function buildOtpEmail(name, otp, title, description, expiresMinutes) {
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
+      .container { max-width: 520px; margin: 30px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+      .header { background: linear-gradient(135deg, #1a237e, #283593); padding: 30px; text-align: center; }
+      .header h1 { color: #ffffff; margin: 0; font-size: 22px; }
+      .header p { color: #b3c0ff; margin: 8px 0 0; font-size: 13px; }
+      .body { padding: 30px; text-align: center; }
+      .title { font-size: 20px; font-weight: bold; color: #1a237e; margin-bottom: 8px; }
+      .desc { font-size: 14px; color: #666; margin-bottom: 24px; }
+      .otp-box { display: inline-block; padding: 18px 36px; background: linear-gradient(135deg, #e8eaf6, #f3f4ff); border: 2px dashed #1a237e; border-radius: 12px; margin: 16px 0; }
+      .otp-code { font-family: 'Courier New', monospace; font-size: 36px; letter-spacing: 10px; color: #1a237e; font-weight: bold; }
+      .expires { font-size: 13px; color: #f57c00; margin-top: 16px; }
+      .warning { background: #fff3e0; border-radius: 8px; padding: 12px; margin-top: 20px; font-size: 12px; color: #e65100; }
+      .footer { text-align: center; padding: 20px; color: #999; font-size: 11px; border-top: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div style="font-size:40px; margin-bottom:8px;">🅿️</div>
+        <h1>Smart Parking</h1>
+        <p>Stationnement intelligent en Tunisie</p>
+      </div>
+      <div class="body">
+        <p style="color:#333; font-size:15px;">Bonjour <strong>${name}</strong>,</p>
+        <p class="title">${title}</p>
+        <p class="desc">${description}</p>
+        <div class="otp-box">
+          <div class="otp-code">${otp}</div>
+        </div>
+        <p class="expires">⏰ Ce code expire dans <strong>${expiresMinutes} minutes</strong></p>
+        <div class="warning">
+          🔒 Ne partagez jamais ce code avec personne. L'équipe Smart Parking ne vous demandera jamais votre code.
+        </div>
+      </div>
+      <div class="footer">
+        <p>© ${new Date().getFullYear()} Smart Parking — Tous droits réservés</p>
+        <p>Si vous n'avez pas effectué cette demande, ignorez cet email.</p>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
 // Validation rules
 const registerValidation = [
   body('firstName')
@@ -110,9 +161,8 @@ router.post('/register', registerValidation, async (req, res) => {
         await transporter.sendMail({
           from: process.env.GMAIL_USER,
           to: user.email,
-          subject: 'Verify Your Email - Smart Parking',
-          text: `Your verification code is: ${emailOtp}. It expires in 10 minutes.`,
-          html: `<p>Your verification code is: <strong>${emailOtp}</strong></p><p>It expires in 10 minutes.</p>`
+          subject: '🔐 Vérifiez votre email — Smart Parking',
+          html: buildOtpEmail(user.firstName || 'Utilisateur', emailOtp, 'Vérification de votre email', 'Utilisez ce code pour vérifier votre adresse email et accéder à Smart Parking.', 10)
         });
       }
     } catch (emailError) {
@@ -240,8 +290,8 @@ router.post('/add-phone-and-send-otp', async (req, res) => {
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
       to: user.email,
-      subject: 'Verify Your Phone Number - OTP',
-      text: `Your OTP to verify phone number is: ${otp}. It expires in 5 minutes.`,
+      subject: '📱 Vérification de votre numéro — Smart Parking',
+      html: buildOtpEmail(user.firstName || 'Utilisateur', otp, 'Vérification de votre numéro de téléphone', 'Utilisez ce code pour confirmer votre numéro de téléphone.', 5)
     });
 
     res.json({ success: true, message: 'OTP sent to your email' });
@@ -297,6 +347,7 @@ router.get('/me', protect, async (req, res) => {
           preferredPaymentMethod: user.preferredPaymentMethod,
           vehicles: user.vehicles,
           isVerified: user.isVerified,
+          role: user.role,
           lastLogin: user.lastLogin,
           loginCount: user.loginCount
         }
@@ -366,9 +417,8 @@ router.post('/send-verify-email', protect, async (req, res) => {
       await transporter.sendMail({
         from: process.env.GMAIL_USER,
         to: user.email,
-        subject: 'Verify Your Email - Smart Parking',
-        text: `Your verification code is: ${otp}. It expires in 10 minutes.`,
-        html: `<p>Your verification code is: <strong>${otp}</strong></p><p>It expires in 10 minutes.</p>`
+        subject: '🔐 Vérifiez votre email — Smart Parking',
+        html: buildOtpEmail(user.firstName || 'Utilisateur', otp, 'Vérification de votre email', 'Utilisez ce code pour vérifier votre adresse email.', 10)
       });
     }
 
@@ -451,9 +501,8 @@ router.post('/forgot-password', [
       await transporter.sendMail({
         from: process.env.GMAIL_USER,
         to: user.email,
-        subject: 'Reset Password - Smart Parking',
-        text: `Your password reset code is: ${otp}. It expires in 10 minutes.`,
-        html: `<p>Your password reset code is: <strong>${otp}</strong></p><p>It expires in 10 minutes.</p>`
+        subject: '🔑 Réinitialisation du mot de passe — Smart Parking',
+        html: buildOtpEmail(user.firstName || 'Utilisateur', otp, 'Réinitialisation du mot de passe', 'Vous avez demandé la réinitialisation de votre mot de passe. Utilisez ce code pour continuer.', 10)
       });
     }
 

@@ -1,11 +1,145 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const nodemailer = require('nodemailer');
 const Booking = require('../models/Booking');
 const Parking = require('../models/Parking');
 const Vehicle = require('../models/Vehicle');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Configure nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  },
+});
+
+// Helper to send reservation confirmation email
+async function sendReservationEmail(user, booking, parking, vehicle) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) return;
+
+  const startDate = new Date(booking.startTime).toLocaleDateString('fr-FR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const startTime = new Date(booking.startTime).toLocaleTimeString('fr-FR', {
+    hour: '2-digit', minute: '2-digit'
+  });
+  const endTime = new Date(booking.endTime).toLocaleTimeString('fr-FR', {
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  const parkingAddress = parking.address
+    ? `${parking.address.street || ''}, ${parking.address.city || ''}`.trim().replace(/^,\s*/, '')
+    : 'Non spécifiée';
+
+  const vehicleInfo = vehicle
+    ? `${vehicle.make} ${vehicle.model} — ${vehicle.licensePlate}`
+    : 'Aucun véhicule spécifié';
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+      .header { background: linear-gradient(135deg, #1a237e, #283593); padding: 30px; text-align: center; }
+      .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+      .header p { color: #b3c0ff; margin: 8px 0 0; font-size: 14px; }
+      .icon { font-size: 48px; margin-bottom: 10px; }
+      .body { padding: 30px; }
+      .success-badge { background: #e8f5e9; color: #2e7d32; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 24px; }
+      .detail-card { background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 4px solid #1a237e; }
+      .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
+      .detail-row:last-child { border-bottom: none; }
+      .detail-label { color: #666; font-size: 14px; }
+      .detail-value { color: #1a237e; font-weight: 600; font-size: 14px; }
+      .qr-section { text-align: center; padding: 20px; background: #f0f4ff; border-radius: 12px; margin: 20px 0; }
+      .qr-code { font-family: monospace; font-size: 18px; letter-spacing: 3px; color: #1a237e; background: #fff; padding: 12px 20px; border-radius: 8px; display: inline-block; border: 2px dashed #1a237e; }
+      .info-box { background: #e3f2fd; border-radius: 8px; padding: 16px; margin-top: 20px; }
+      .info-box p { margin: 4px 0; font-size: 13px; color: #1565c0; }
+      .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="icon">🅿️</div>
+        <h1>Smart Parking</h1>
+        <p>Confirmation de réservation</p>
+      </div>
+      <div class="body">
+        <div class="success-badge">✅ Réservation confirmée !</div>
+
+        <p style="color:#333;">Bonjour <strong>${user.firstName}</strong>,</p>
+        <p style="color:#555;">Votre place de parking a été réservée avec succès. Voici les détails :</p>
+
+        <div class="detail-card">
+          <div class="detail-row">
+            <span class="detail-label">🏢 Parking</span>
+            <span class="detail-value">${parking.name}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📍 Adresse</span>
+            <span class="detail-value">${parkingAddress}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📅 Date</span>
+            <span class="detail-value">${startDate}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🕐 Heure début</span>
+            <span class="detail-value">${startTime}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🕐 Heure fin</span>
+            <span class="detail-value">${endTime}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🚗 Véhicule</span>
+            <span class="detail-value">${vehicleInfo}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">💰 Tarif horaire</span>
+            <span class="detail-value">${parking.pricing?.hourly || 0} DT/h</span>
+          </div>
+        </div>
+
+        <div class="qr-section">
+          <p style="font-weight:bold; color:#1a237e; margin-bottom:12px;">📱 Votre code QR</p>
+          <div class="qr-code">${booking.qrCode || booking._id}</div>
+          <p style="font-size:12px; color:#666; margin-top:10px;">Présentez ce code à l'entrée du parking</p>
+        </div>
+
+        <div class="info-box">
+          <p>📌 Présentez le QR code à l'entrée du parking</p>
+          <p>💵 Le paiement se fait en espèces à la sortie</p>
+          <p>⏰ Le tarif est calculé selon la durée de stationnement</p>
+        </div>
+      </div>
+      <div class="footer">
+        <p>© ${new Date().getFullYear()} Smart Parking — Stationnement intelligent en Tunisie</p>
+      </div>
+    </div>
+  </body>
+  </html>`;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: user.email,
+      subject: `🅿️ Réservation confirmée — ${parking.name}`,
+      html,
+    });
+  } catch (emailError) {
+    console.error('Reservation email error:', emailError);
+  }
+}
 
 // Validation rules
 const createBookingValidation = [
@@ -108,6 +242,12 @@ router.post('/reserve', protect, async (req, res) => {
     const populatedBooking = await Booking.findById(booking._id)
       .populate('parking', 'name address coordinates pricing')
       .populate('vehicle', 'licensePlate make model');
+
+    // Send reservation confirmation email
+    const user = await User.findById(req.user._id);
+    if (user) {
+      sendReservationEmail(user, populatedBooking, parking, vehicle);
+    }
 
     res.status(201).json({
       success: true,

@@ -49,6 +49,8 @@ dependencies:
   screenshot: ^3.0.0  # For QR code download
   path_provider: ^2.1.5  # For file saving
   permission_handler: ^11.3.1  # For storage permissions
+  pdf: ^3.11.3
+  printing: ^5.14.2
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'profile_header.dart';
 import 'profile_menu.dart';
 import '../../authentication/auth_provider.dart';
@@ -35,6 +36,88 @@ class ProfileBody extends StatelessWidget {
     }
   }
 
+  void _showSupportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.support_agent, color: Colors.blue.shade700, size: 28),
+            const SizedBox(width: 12),
+            const Text('Support Client', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vous pouvez contacter notre support client par mail ou téléphone :',
+              style: TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+            const SizedBox(height: 20),
+            InkWell(
+              onTap: () async {
+                final uri = Uri(scheme: 'mailto', path: 'Balssem.Zoghbi@keyrus.com');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.email, color: Colors.blue.shade700),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Balssem.Zoghbi@keyrus.com',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async {
+                final uri = Uri(scheme: 'tel', path: '+21629930536');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.phone, color: Colors.green.shade700),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '+216 29 930 536',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue,
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -46,7 +129,13 @@ class ProfileBody extends StatelessWidget {
           const Divider(height: 8),
           const ProfileMenu(iconData: Icons.history, textData: 'Historique des Réservations', page: BookingHistoryPage()),
           const Divider(height: 8),
-          const ProfileMenu(iconData: Icons.support_agent, textData: 'Support'),
+          Builder(
+            builder: (context) => ProfileMenu(
+              iconData: Icons.support_agent,
+              textData: 'Support',
+              onTapOverride: () => _showSupportDialog(context),
+            ),
+          ),
           const Divider(height: 8),
           const ProfileMenu(iconData: Icons.settings, textData: 'Paramètres'),
           const Divider(height: 8),

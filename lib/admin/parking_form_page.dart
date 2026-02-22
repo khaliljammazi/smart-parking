@@ -16,7 +16,8 @@ class ParkingFormPage extends StatefulWidget {
 class _ParkingFormPageState extends State<ParkingFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _cityController = TextEditingController();
   final _totalSpotsController = TextEditingController();
   final _priceController = TextEditingController();
   double? _latitude;
@@ -28,25 +29,31 @@ class _ParkingFormPageState extends State<ParkingFormPage> {
     super.initState();
     if (widget.parking != null) {
       _nameController.text = widget.parking!.name;
-      _addressController.text = widget.parking!.address;
+      // Parse existing address into street/city
+      final parts = widget.parking!.address.split(',');
+      _streetController.text = parts.isNotEmpty ? parts[0].trim() : '';
+      _cityController.text = parts.length > 1 ? parts[1].trim() : 'Tunis';
       _totalSpotsController.text = widget.parking!.totalSpots.toString();
       _priceController.text = widget.parking!.pricePerHour.toString();
       _latitude = widget.parking!.latitude;
       _longitude = widget.parking!.longitude;
+    } else {
+      _cityController.text = 'Tunis';
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
+    _streetController.dispose();
+    _cityController.dispose();
     _totalSpotsController.dispose();
     _priceController.dispose();
     super.dispose();
   }
 
   Future<void> _selectLocation() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MapPage(
@@ -75,7 +82,11 @@ class _ParkingFormPageState extends State<ParkingFormPage> {
 
     final parkingData = {
       'name': _nameController.text,
-      'address': _addressController.text,
+      'address': {
+        'street': _streetController.text.trim(),
+        'city': _cityController.text.trim(),
+        'country': 'Tunisia',
+      },
       'coordinates': {
         'latitude': _latitude,
         'longitude': _longitude,
@@ -120,23 +131,49 @@ class _ParkingFormPageState extends State<ParkingFormPage> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nom du Parking'),
+                decoration: const InputDecoration(
+                  labelText: 'Nom du Parking',
+                  prefixIcon: Icon(Icons.local_parking),
+                ),
                 validator: (value) => value!.isEmpty ? 'Requis' : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Adresse'),
-                validator: (value) => value!.isEmpty ? 'Requis' : null,
+                controller: _streetController,
+                decoration: const InputDecoration(
+                  labelText: 'Rue / Adresse',
+                  prefixIcon: Icon(Icons.location_on),
+                  hintText: 'Ex: Avenue Habib Bourguiba',
+                ),
+                validator: (value) => value!.isEmpty ? 'La rue est requise' : null,
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _cityController,
+                decoration: const InputDecoration(
+                  labelText: 'Ville',
+                  prefixIcon: Icon(Icons.location_city),
+                  hintText: 'Ex: Tunis',
+                ),
+                validator: (value) => value!.isEmpty ? 'La ville est requise' : null,
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _totalSpotsController,
-                decoration: const InputDecoration(labelText: 'Nombre total de places'),
+                decoration: const InputDecoration(
+                  labelText: 'Nombre total de places',
+                  prefixIcon: Icon(Icons.numbers),
+                ),
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Requis' : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Prix par heure (DT)'),
+                decoration: const InputDecoration(
+                  labelText: 'Prix par heure (DT)',
+                  prefixIcon: Icon(Icons.attach_money),
+                ),
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Requis' : null,
               ),

@@ -1,10 +1,39 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Multer config for avatar uploads
+const uploadsDir = path.join(__dirname, '../../uploads/avatars');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `avatar_${req.user._id}_${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    if (ext && mime) return cb(null, true);
+    cb(new Error('Only image files are allowed'));
+  },
+});
 
 // Validation rules
 const updateProfileValidation = [
@@ -122,6 +151,38 @@ router.put('/profile', protect, updateProfileValidation, async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   POST /api/users/avatar
+// @desc    Upload user avatar
+// @access  Private
+router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file provided' });
+    }
+
+    // Delete old avatar file if exists
+    const user = await User.findById(req.user._id);
+    if (user.avatar && user.avatar.includes('/uploads/avatars/')) {
+      const oldPath = path.join(__dirname, '../../', user.avatar.replace(/^\//, ''));
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    await User.findByIdAndUpdate(req.user._id, { avatar: avatarUrl });
+
+    res.json({
+      success: true,
+      message: 'Avatar updated successfully',
+      data: { avatar: avatarUrl }
+    });
+  } catch (error) {
+    console.error('Upload avatar error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../utils/constanst.dart';
 import 'admin_service.dart';
 
@@ -52,6 +55,131 @@ class _ReportsPageState extends State<ReportsPage>
     }
   }
 
+  Future<void> _exportPDF() async {
+    final stats = _dashboardData?['statistics'] ?? {};
+    final summary = _revenueData?['summary'] ?? {};
+    final byParking = (_revenueData?['revenueByParking'] as List<dynamic>?) ?? [];
+    final totalBookings = stats['totalBookings'] ?? 0;
+    final activeBookings = stats['activeBookings'] ?? 0;
+    final completedBookings = totalBookings - activeBookings;
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Smart Parking', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
+                pw.Text('Rapport - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              ],
+            ),
+            pw.Divider(color: PdfColors.indigo900, thickness: 2),
+            pw.SizedBox(height: 10),
+          ],
+        ),
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text('Page ${context.pageNumber}/${context.pagesCount}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+        ),
+        build: (context) => [
+          // General Stats Section
+          pw.Text('Vue d\'ensemble', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
+          pw.SizedBox(height: 12),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey300),
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.indigo50),
+                children: [
+                  _pdfCell('Indicateur', bold: true),
+                  _pdfCell('Valeur', bold: true),
+                ],
+              ),
+              pw.TableRow(children: [_pdfCell('Total utilisateurs'), _pdfCell('${stats['totalUsers'] ?? 0}')]),
+              pw.TableRow(children: [_pdfCell('Total parkings'), _pdfCell('${stats['totalParkings'] ?? 0}')]),
+              pw.TableRow(children: [_pdfCell('Total reservations'), _pdfCell('$totalBookings')]),
+              pw.TableRow(children: [_pdfCell('Reservations actives'), _pdfCell('$activeBookings')]),
+              pw.TableRow(children: [_pdfCell('Reservations terminees'), _pdfCell('$completedBookings')]),
+              pw.TableRow(children: [
+                _pdfCell('Taux de completion'),
+                _pdfCell(totalBookings > 0 ? '${(completedBookings / totalBookings * 100).toStringAsFixed(1)}%' : '0%'),
+              ]),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Revenue Section
+          pw.Text('Analyse des revenus', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
+          pw.SizedBox(height: 12),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey300),
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.green50),
+                children: [
+                  _pdfCell('Indicateur', bold: true),
+                  _pdfCell('Valeur', bold: true),
+                ],
+              ),
+              pw.TableRow(children: [_pdfCell('Revenu total'), _pdfCell('${(summary['totalRevenue'] ?? 0.0).toStringAsFixed(2)} DT')]),
+              pw.TableRow(children: [_pdfCell('Moyenne par reservation'), _pdfCell('${(summary['averageRevenue'] ?? 0.0).toStringAsFixed(2)} DT')]),
+              pw.TableRow(children: [_pdfCell('Nombre de reservations'), _pdfCell('${summary['totalBookings'] ?? 0}')]),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+
+          // Revenue by parking
+          if (byParking.isNotEmpty) ...[
+            pw.Text('Revenus par parking', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
+            pw.SizedBox(height: 12),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.orange50),
+                  children: [
+                    _pdfCell('#', bold: true),
+                    _pdfCell('Parking', bold: true),
+                    _pdfCell('Reservations', bold: true),
+                    _pdfCell('Revenu (DT)', bold: true),
+                  ],
+                ),
+                ...byParking.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final p = entry.value;
+                  return pw.TableRow(children: [
+                    _pdfCell('${i + 1}'),
+                    _pdfCell(p['name'] ?? 'Inconnu'),
+                    _pdfCell('${p['bookingCount'] ?? 0}'),
+                    _pdfCell('${(p['totalRevenue'] ?? 0.0).toStringAsFixed(2)}'),
+                  ]);
+                }),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) => pdf.save(),
+      name: 'SmartParking_Rapport_${DateTime.now().day}_${DateTime.now().month}_${DateTime.now().year}',
+    );
+  }
+
+  static pw.Widget _pdfCell(String text, {bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(8),
+      child: pw.Text(text, style: pw.TextStyle(fontSize: 11, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,6 +191,8 @@ class _ReportsPageState extends State<ReportsPage>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(text: 'Général', icon: Icon(Icons.dashboard)),
             Tab(text: 'Revenus', icon: Icon(Icons.monetization_on)),
@@ -70,6 +200,11 @@ class _ReportsPageState extends State<ReportsPage>
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _isLoading ? null : _exportPDF,
+            tooltip: 'Exporter en PDF',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadReportData,

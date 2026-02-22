@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 import '../utils/backend_api.dart';
 import '../utils/bottom_sheets.dart';
 import '../utils/shimmer_loading.dart';
+import '../utils/role_helper.dart';
+import '../authentication/auth_provider.dart';
+import '../admin/admin_service.dart';
+import '../admin/parking_form_page.dart';
 import '../location/map_page.dart';
 import 'parking_detail_page.dart';
 
@@ -147,10 +152,13 @@ class _ParkingListPageState extends State<ParkingListPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userRole = authProvider.userProfile?['role'];
+    final isAdmin = RoleHelper.isFullAdmin(userRole);
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Places de Parking'),
+        title: Text(isAdmin ? 'Gérer les parkings' : 'Places de Parking'),
         backgroundColor: isDark ? const Color(0xFF1A1F3A) : AppColor.navy,
         foregroundColor: Colors.white,
         actions: [
@@ -166,6 +174,19 @@ class _ParkingListPageState extends State<ParkingListPage> {
           ),
         ],
       ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ParkingFormPage()),
+                );
+                if (result == true) _loadParkings();
+              },
+              backgroundColor: AppColor.navy,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
       body: Column(
         children: [
           // Search Bar
@@ -318,6 +339,10 @@ class _ParkingListPageState extends State<ParkingListPage> {
   }
 
   Widget _buildParkingCard(ParkingModel spot, bool isDark) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userRole = authProvider.userProfile?['role'];
+    final isAdmin = RoleHelper.isFullAdmin(userRole);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: isDark ? 0 : 2,
@@ -394,36 +419,92 @@ class _ParkingListPageState extends State<ParkingListPage> {
                   ],
                 ),
               ),
-              // Rating
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          spot.rating.toString(),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber,
-                          ),
+              // Admin actions or Rating
+              if (isAdmin)
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ParkingFormPage(parking: spot),
                         ),
-                      ],
+                      );
+                      if (result == true) _loadParkings();
+                    } else if (value == 'delete') {
+                      _confirmDeleteParking(spot);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.blue), title: Text('Modifier'))),
+                    const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Supprimer'))),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            spot.rating.toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteParking(ParkingModel parking) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer Parking'),
+        content: Text('Êtes-vous sûr de vouloir supprimer ${parking.name} ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success = await AdminService.deleteParking(parking.id);
+      if (success && mounted) {
+        _loadParkings();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Parking supprimé avec succès'), backgroundColor: Colors.green),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la suppression'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildChip(String label, IconData icon, Color color) {
