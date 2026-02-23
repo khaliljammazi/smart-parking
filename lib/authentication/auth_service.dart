@@ -46,6 +46,24 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    // First invalidate the session on the backend
+    try {
+      final token = await getToken();
+      if (token != null) {
+        await http.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+      }
+    } catch (e) {
+      // Network error during logout — still clear local token
+      debugPrint('Backend logout error (ignored): $e');
+    }
+
+    // Clear local token
     await _initPrefs();
     if (kIsWeb) {
       await _prefs.remove('auth_token');

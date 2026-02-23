@@ -128,15 +128,20 @@ class _MyAppState extends State<MyApp> {
           ],
           home: const AuthWrapper(),
           routes: {
+            // Public routes — always accessible
             '/login': (context) => const LoginPage(),
-            '/home': (context) => const BottomBarPage(),
-            '/admin': (context) =>
-                const AdminRouteGuard(child: AdminDashboardPage()),
             '/forgot-password': (context) => const ForgotPasswordPage(),
             '/signup': (context) => const SignUpPage(),
             '/verify-email': (context) => const EmailVerificationPage(),
-            '/settings': (context) => const SettingsPage(),
-            '/notifications': (context) => const NotificationPage(),
+            // Protected routes — require authentication
+            '/home': (context) =>
+                const AuthRouteGuard(child: BottomBarPage()),
+            '/admin': (context) => const AuthRouteGuard(
+                child: AdminRouteGuard(child: AdminDashboardPage())),
+            '/settings': (context) =>
+                const AuthRouteGuard(child: SettingsPage()),
+            '/notifications': (context) =>
+                const AuthRouteGuard(child: NotificationPage()),
           },
         );
       },

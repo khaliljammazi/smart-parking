@@ -34,6 +34,20 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
     _focusNodes = List.generate(widget.otpLength, (_) => FocusNode());
     _remainingSeconds = widget.countdownSeconds;
     _startCountdown();
+
+    // Listen for paste via clipboard on each focus node
+    for (int i = 0; i < widget.otpLength; i++) {
+      final index = i;
+      _focusNodes[index].addListener(() {
+        // When a field is focused, select all text so typing replaces it
+        if (_focusNodes[index].hasFocus) {
+          _controllers[index].selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _controllers[index].text.length,
+          );
+        }
+      });
+    }
   }
 
   void _startCountdown() {
@@ -57,29 +71,68 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
   }
 
   void _onChanged(String value, int index) {
-    if (value.length == 1) {
+    // Handle pasted multi-character input (works on mobile & web)
+    if (value.length > 1) {
+      final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+      _handlePaste(digits);
+      return;
+    }
+
+    if (value.isNotEmpty) {
+      // Ensure only digit
+      final digit = value.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digit.isEmpty) {
+        _controllers[index].clear();
+        return;
+      }
+      _controllers[index].text = digit;
+      _controllers[index].selection = TextSelection.fromPosition(
+        TextPosition(offset: 1),
+      );
+
       if (index < widget.otpLength - 1) {
         _focusNodes[index + 1].requestFocus();
       } else {
         _focusNodes[index].unfocus();
-        // Check if all fields are filled
-        final otp = _controllers.map((c) => c.text).join();
-        if (otp.length == widget.otpLength) {
-          widget.onCompleted(otp);
-        }
       }
-    } else if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
+    } else {
+      // Backspace — go back
+      if (index > 0) {
+        _focusNodes[index - 1].requestFocus();
+      }
+    }
+
+    // Check if all filled
+    final otp = _controllers.map((c) => c.text).join();
+    if (otp.length == widget.otpLength) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onCompleted(otp);
+      });
     }
   }
 
   void _handlePaste(String text) {
-    if (text.length >= widget.otpLength) {
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isNotEmpty) {
       for (int i = 0; i < widget.otpLength; i++) {
-        _controllers[i].text = text[i];
+        _controllers[i].text = i < digits.length ? digits[i] : '';
       }
-      _focusNodes[widget.otpLength - 1].unfocus();
-      widget.onCompleted(text.substring(0, widget.otpLength));
+      // Move focus to last filled field
+      final lastIndex = (digits.length - 1).clamp(0, widget.otpLength - 1);
+      _focusNodes[lastIndex].requestFocus();
+
+      if (digits.length >= widget.otpLength) {
+        _focusNodes[widget.otpLength - 1].unfocus();
+        widget.onCompleted(digits.substring(0, widget.otpLength));
+      }
+      setState(() {});
+    }
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data != null && data.text != null) {
+      _handlePaste(data.text!);
     }
   }
 
@@ -98,7 +151,7 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -114,7 +167,8 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
                 focusNode: _focusNodes[index],
                 textAlign: TextAlign.center,
                 keyboardType: TextInputType.number,
-                maxLength: 1,
+                // No maxLength / LengthLimitingFormatter here — we handle
+                // length manually in onChanged so paste works on all platforms
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -123,36 +177,54 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
                 decoration: InputDecoration(
                   counterText: '',
                   filled: true,
-                  fillColor: isDark ? const Color(0xFF252B48) : Colors.grey.shade100,
+                  fillColor: isDark
+                      ? const Color(0xFF252B48)
+                      : Colors.grey.shade100,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: isDark ? const Color(0xFF1E88E5) : const Color(0xFF064789),
+                      color: isDark
+                          ? const Color(0xFF1E88E5)
+                          : const Color(0xFF064789),
                       width: 2,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: isDark ? Colors.white30 : Colors.grey.shade300,
+                      color: _controllers[index].text.isNotEmpty
+                          ? (isDark
+                              ? const Color(0xFF1E88E5)
+                              : const Color(0xFF064789))
+                          : (isDark ? Colors.white30 : Colors.grey.shade300),
+                      width: _controllers[index].text.isNotEmpty ? 2 : 1,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: isDark ? const Color(0xFF1E88E5) : const Color(0xFF064789),
+                      color: isDark
+                          ? const Color(0xFF1E88E5)
+                          : const Color(0xFF064789),
                       width: 2,
                     ),
                   ),
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(1),
-                ],
                 onChanged: (value) => _onChanged(value, index),
-                onTap: () {
-                  _controllers[index].selection = TextSelection.fromPosition(
-                    TextPosition(offset: _controllers[index].text.length),
+                // Allow long-press paste via context menu
+                contextMenuBuilder: (context, editableTextState) {
+                  return AdaptiveTextSelectionToolbar(
+                    anchors: editableTextState.contextMenuAnchors,
+                    children: [
+                      TextSelectionToolbarTextButton(
+                        padding: const EdgeInsets.all(8),
+                        onPressed: () async {
+                          editableTextState.hideToolbar();
+                          await _pasteFromClipboard();
+                        },
+                        child: const Text('Paste'),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -160,7 +232,7 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
           }),
         ),
         const SizedBox(height: 24),
-        
+
         // Countdown Timer
         if (!_canResend)
           Row(
@@ -196,20 +268,16 @@ class _OTPInputWidgetState extends State<OTPInputWidget> {
             icon: const Icon(Icons.refresh),
             label: const Text('Resend OTP'),
             style: TextButton.styleFrom(
-              foregroundColor: isDark ? const Color(0xFF1E88E5) : const Color(0xFF064789),
+              foregroundColor:
+                  isDark ? const Color(0xFF1E88E5) : const Color(0xFF064789),
             ),
           ),
-        
+
         const SizedBox(height: 16),
-        
-        // Paste from clipboard hint
+
+        // Paste from clipboard button
         TextButton.icon(
-          onPressed: () async {
-            final data = await Clipboard.getData(Clipboard.kTextPlain);
-            if (data != null && data.text != null) {
-              _handlePaste(data.text!);
-            }
-          },
+          onPressed: _pasteFromClipboard,
           icon: Icon(
             Icons.content_paste,
             size: 18,

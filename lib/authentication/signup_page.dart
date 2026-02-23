@@ -15,13 +15,34 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  
+  bool _passwordFocused = false;
+  String _passwordValue = '';
+
+  // Password requirement flags (computed from current value)
+  bool get _hasUppercase => RegExp(r'[A-Z]').hasMatch(_passwordValue);
+  bool get _hasNumber => RegExp(r'[0-9]').hasMatch(_passwordValue);
+  bool get _hasSpecial =>
+      RegExp(r'[!@#%^&*(),.?":{}|<>_\-+=\[\]\\/`~;' "'" r']').hasMatch(_passwordValue);
+  bool get _hasMinLength => _passwordValue.length >= 8;
+
   // Controllers
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(() {
+      setState(() => _passwordValue = _passwordController.text);
+    });
+    _passwordFocusNode.addListener(() {
+      setState(() => _passwordFocused = _passwordFocusNode.hasFocus);
+    });
+  }
 
   @override
   void dispose() {
@@ -30,6 +51,7 @@ class _SignUpPageState extends State<SignUpPage> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -178,6 +200,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 // Password
                 _buildTextField(
                   controller: _passwordController,
+                  focusNode: _passwordFocusNode,
                   label: 'Password',
                   icon: Icons.lock_outline,
                   obscureText: _obscurePassword,
@@ -191,12 +214,37 @@ class _SignUpPageState extends State<SignUpPage> {
                     },
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (value.length < 6) return 'Min 6 characters';
+                    if (value == null || value.isEmpty) return 'Password is required';
+                    final missing = <String>[];
+                    if (value.length < 8) missing.add('at least 8 characters');
+                    if (!RegExp(r'[A-Z]').hasMatch(value))
+                      missing.add('an uppercase letter');
+                    if (!RegExp(r'[0-9]').hasMatch(value))
+                      missing.add('a number (0–9)');
+                    if (!RegExp(r'[!@#%^&*(),.?":{}|<>_\-+=\[\]\\/`~;' "'" r']')
+                        .hasMatch(value))
+                      missing.add('a special character (!@#%...)');
+                    if (missing.isNotEmpty) {
+                      return 'Missing: ${missing.join(', ')}';
+                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                // Real-time requirements checklist
+                if (_passwordFocused || _passwordValue.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, left: 4, bottom: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRequirement('At least 8 characters', _hasMinLength),
+                        _buildRequirement('One uppercase letter (A–Z)', _hasUppercase),
+                        _buildRequirement('One number (0–9)', _hasNumber),
+                        _buildRequirement('One special character (!@#\$%…)', _hasSpecial),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 24),
 
                 // Sign Up Button
                 ElevatedButton(
@@ -262,6 +310,7 @@ class _SignUpPageState extends State<SignUpPage> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    FocusNode? focusNode,
     TextInputType? keyboardType,
     bool obscureText = false,
     Widget? suffixIcon,
@@ -269,6 +318,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       style: const TextStyle(color: Colors.white),
       keyboardType: keyboardType,
       obscureText: obscureText,
@@ -295,8 +345,37 @@ class _SignUpPageState extends State<SignUpPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.redAccent),
         ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+        ),
+        errorMaxLines: 3,
       ),
       validator: validator,
+    );
+  }
+
+  /// Shows a single password requirement row with a green check (met) or red × (not met).
+  Widget _buildRequirement(String label, bool met) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle_outline : Icons.cancel_outlined,
+            size: 16,
+            color: met ? Colors.greenAccent : Colors.redAccent.shade100,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: met ? Colors.greenAccent : Colors.white60,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

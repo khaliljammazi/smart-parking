@@ -3,6 +3,45 @@ import 'package:provider/provider.dart';
 import '../authentication/auth_provider.dart';
 import 'role_helper.dart';
 
+/// Wraps any protected route and redirects unauthenticated users to /login.
+/// Use this on every named route that should require authentication.
+class AuthRouteGuard extends StatelessWidget {
+  final Widget child;
+
+  const AuthRouteGuard({required this.child, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        // Still initialising — show splash-style loader
+        if (auth.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (!auth.isAuthenticated) {
+          // Schedule redirect after the current build frame
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/login',
+                (route) => false,
+              );
+            }
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return child;
+      },
+    );
+  }
+}
+
 /// Route guard widget that protects admin routes
 /// Redirects non-admin users to home page
 class AdminRouteGuard extends StatelessWidget {
