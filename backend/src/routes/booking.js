@@ -28,9 +28,6 @@ async function sendReservationEmail(user, booking, parking, vehicle) {
   const startTime = new Date(booking.startTime).toLocaleTimeString('fr-FR', {
     hour: '2-digit', minute: '2-digit'
   });
-  const endTime = new Date(booking.endTime).toLocaleTimeString('fr-FR', {
-    hour: '2-digit', minute: '2-digit'
-  });
 
   const parkingAddress = parking.address
     ? `${parking.address.street || ''}, ${parking.address.city || ''}`.trim().replace(/^,\s*/, '')
@@ -93,12 +90,12 @@ async function sendReservationEmail(user, booking, parking, vehicle) {
             <span class="detail-value">${startDate}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">🕐 Heure début</span>
+            <span class="detail-label">🕐 Heure d'arrivée</span>
             <span class="detail-value">${startTime}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">🕐 Heure fin</span>
-            <span class="detail-value">${endTime}</span>
+            <span class="detail-label">⏱️ Durée</span>
+            <span class="detail-value">Selon votre stationnement</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">🚗 Véhicule</span>

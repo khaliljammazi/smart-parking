@@ -54,14 +54,6 @@ class SettingsPage extends StatelessWidget {
                 title: const Text('Politique de Confidentialité'),
                 onTap: () {},
               ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.admin_panel_settings, color: AppColor.navy),
-                title: const Text('Admin'),
-                onTap: () {
-                  Navigator.pushNamed(context, '/admin');
-                },
-              ),
             ],
           );
         },

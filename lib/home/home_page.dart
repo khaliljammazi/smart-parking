@@ -40,8 +40,18 @@ class _HomePageState extends State<HomePage> {
     _getCurrentLocation();
   }
 
-  // Hammamet coordinates: 36.4000, 10.6167
-  // Tunis coordinates: 36.8065, 10.1815
+  // Try nearby with increasing radius, fallback to all parkings
+  Future<List<ParkingModel>> _getNearbyWithFallback() async {
+    if (lat == null || long == null) return [];
+    // Try with 50km radius first
+    var parkings = await BackendApi.getParkingSpots(lat!, long!, 50000);
+    if (parkings.isEmpty) {
+      // Fallback: get all parkings
+      parkings = await BackendApi.getAllParkingSpots();
+    }
+    return parkings;
+  }
+
   void _selectCity(String city) {
     setState(() {
       switch (city) {
@@ -89,14 +99,62 @@ class _HomePageState extends State<HomePage> {
       _locationError = null;
     });
 
-    // Skip location services on web platform - default to Hammamet
+    // On web, try HTML5 Geolocation API
     if (kIsWeb) {
+      try {
+        // On web, Geolocator uses the browser's geolocation API
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission == LocationPermission.always ||
+              permission == LocationPermission.whileInUse) {
+            Position position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 15),
+              ),
+            );
+            if (mounted) {
+              // Try reverse geocoding
+              String newAddress = 'Position actuelle';
+              try {
+                List<Placemark> placemarks = await placemarkFromCoordinates(
+                  position.latitude, position.longitude,
+                );
+                if (placemarks.isNotEmpty) {
+                  final place = placemarks.first;
+                  if (place.locality != null && place.locality!.isNotEmpty) {
+                    newAddress = place.locality!;
+                    if (place.country != null && place.country!.isNotEmpty) {
+                      newAddress += ', ${place.country!}';
+                    }
+                  }
+                }
+              } catch (_) {}
+              setState(() {
+                lat = position.latitude;
+                long = position.longitude;
+                address = newAddress;
+                _locationLoading = false;
+              });
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Web geolocation error: $e');
+        }
+      }
+      // Fallback for web if geolocation fails
       if (mounted) {
         setState(() {
-          // Default to Hammamet for web users
-          lat = 36.4000;
-          long = 10.6167;
-          address = 'Hammamet, Tunisie';
+          lat = 36.8065;
+          long = 10.1815;
+          address = 'Tunis, Tunisie';
           _locationLoading = false;
         });
       }
@@ -368,7 +426,7 @@ class _HomePageState extends State<HomePage> {
                       height: 340,
                       child: FutureBuilder<List<ParkingModel>>(
                         future: lat != null && long != null
-                            ? BackendApi.getParkingSpots(lat!, long!, 5000)
+                            ? _getNearbyWithFallback()
                             : Future.value([]),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
