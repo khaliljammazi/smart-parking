@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     validate: {
-      validator: function(email) {
+      validator: function (email) {
         return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(email);
       },
       message: 'Please enter a valid email'
@@ -29,11 +29,11 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.googleId; // Phone required for email signup only
     },
     validate: {
-      validator: function(phone) {
+      validator: function (phone) {
         return /^\+?[\d\s\-\(\)]+$/.test(phone);
       },
       message: 'Please enter a valid phone number'
@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema({
   // Authentication
   password: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.googleId; // Password required for email signup
     },
     minlength: [6, 'Password must be at least 6 characters'],
@@ -72,7 +72,7 @@ const userSchema = new mongoose.Schema({
   dateOfBirth: {
     type: Date,
     validate: {
-      validator: function(dob) {
+      validator: function (dob) {
         return dob <= new Date();
       },
       message: 'Date of birth cannot be in the future'
@@ -155,12 +155,12 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ phone: 1 });
 
 // Virtual for full name
-userSchema.virtual('fullName').get(function() {
+userSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 
 // Pre-save middleware to hash password
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password') || !this.password) return next();
 
@@ -175,23 +175,26 @@ userSchema.pre('save', async function(next) {
 });
 
 // Instance method to check password
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Instance method to generate auth token
-userSchema.methods.generateAuthToken = function() {
+// Pass a sessionId (from a Session document) to enable server-side invalidation.
+userSchema.methods.generateAuthToken = function (sessionId) {
   const jwt = require('jsonwebtoken');
+  const payload = { userId: this._id, email: this.email };
+  if (sessionId) payload.sessionId = sessionId;
   return jwt.sign(
-    { userId: this._id, email: this.email },
+    payload,
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    { expiresIn: process.env.JWT_EXPIRE || '30d' }
   );
 };
 
 // Static method to find user by email or OAuth ID
-userSchema.statics.findByEmailOrOAuth = function(email, googleId = null) {
+userSchema.statics.findByEmailOrOAuth = function (email, googleId = null) {
   const query = { $or: [{ email }] };
   if (googleId) query.$or.push({ googleId });
   return this.findOne(query);

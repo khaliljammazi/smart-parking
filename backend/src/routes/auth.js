@@ -4,9 +4,22 @@ const { body, validationResult } = require('express-validator');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const User = require('../models/User');
+const Session = require('../models/Session');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Helper: create a DB session and return the sessionId
+async function createSession(userId, req) {
+  const expiresMs = parseInt(process.env.SESSION_EXPIRE_DAYS || '30') * 24 * 60 * 60 * 1000;
+  const session = await Session.create({
+    userId,
+    expiresAt: new Date(Date.now() + expiresMs),
+    userAgent: req.headers['user-agent'] || null,
+    ipAddress: req.ip || null,
+  });
+  return session.sessionId;
+}
 
 // In-memory OTP store (for demo; use Redis or DB in production)
 const otpStore = new Map(); // key: email, value: { otp: string, expires: Date }
@@ -147,8 +160,9 @@ router.post('/register', registerValidation, async (req, res) => {
 
     await user.save();
 
-    // Generate token
-    const token = user.generateAuthToken();
+    // Generate token with session
+    const sessionId = await createSession(user._id, req);
+    const token = user.generateAuthToken(sessionId);
 
     // Update login info
     user.lastLogin = new Date();
@@ -236,8 +250,9 @@ router.post('/login', loginValidation, async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = user.generateAuthToken();
+    // Generate token with session
+    const sessionId = await createSession(user._id, req);
+    const token = user.generateAuthToken(sessionId);
 
     // Update login info
     user.lastLogin = new Date();
@@ -370,7 +385,8 @@ router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
   async (req, res) => {
     try {
-      const token = req.user.generateAuthToken();
+      const sessionId = await createSession(req.user._id, req);
+      const token = req.user.generateAuthToken(sessionId);
 
       // Update login info
       req.user.lastLogin = new Date();
@@ -388,13 +404,33 @@ router.get('/google/callback',
 );
 
 // @route   POST /api/auth/logout
-// @desc    Logout user
+// @desc    Logout user — invalidates the DB session
 // @access  Private
-router.post('/logout', protect, (req, res) => {
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
+router.post('/logout', protect, async (req, res) => {
+  try {
+    // Extract sessionId from the JWT (if present) and deactivate the session
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const jwt = require('jsonwebtoken');
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.sessionId) {
+          await Session.findOneAndUpdate(
+            { sessionId: decoded.sessionId },
+            { isActive: false }
+          );
+        }
+      } catch (_) { /* ignore decode errors on logout */ }
+    }
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, message: 'Server error during logout' });
+  }
 });
 
 // @route   POST /api/auth/send-verify-email
@@ -462,7 +498,8 @@ router.post('/verify-email', [
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    const token = user.generateAuthToken();
+    const sessionId = await createSession(user._id, req);
+    const token = user.generateAuthToken(sessionId);
 
     res.json({
       success: true,

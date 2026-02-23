@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Session = require('../models/Session');
 
 // Protect routes - require authentication
 const protect = async (req, res, next) => {
@@ -23,27 +24,44 @@ const protect = async (req, res, next) => {
       });
     }
 
+    let decoded;
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get user from token
-      req.user = await User.findById(decoded.userId);
-
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-
-      next();
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this route'
       });
     }
+
+    // If the token carries a sessionId, validate it against the DB.
+    // Tokens issued before session tracking (no sessionId) are still accepted
+    // to avoid breaking existing installs; new logins will always have one.
+    if (decoded.sessionId) {
+      const session = await Session.findOne({
+        sessionId: decoded.sessionId,
+        isActive: true,
+      });
+
+      if (!session) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session expired or logged out. Please log in again.'
+        });
+      }
+    }
+
+    // Get user from token
+    req.user = await User.findById(decoded.userId);
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    next();
   } catch (error) {
     return res.status(500).json({
       success: false,
