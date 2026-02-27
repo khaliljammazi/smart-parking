@@ -170,18 +170,24 @@ class ParkingCardHome extends StatelessWidget {
                     Row(
                       children: [
                         if (carPrice != null)
-                          RegularText(
-                            text: 'Voiture: ${carPrice!.toStringAsFixed(0)} DT/h',
-                            fontSize: 12,
-                            color: AppColor.navy,
+                          Flexible(
+                            child: RegularText(
+                              text: 'Voiture: ${carPrice!.toStringAsFixed(0)} DT/h',
+                              fontSize: 12,
+                              color: AppColor.navy,
+                              maxLine: 1,
+                            ),
                           ),
                         if (carPrice != null && motoPrice != null)
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                         if (motoPrice != null)
-                          RegularText(
-                            text: 'Moto: ${motoPrice!.toStringAsFixed(0)} DT/h',
-                            fontSize: 12,
-                            color: AppColor.orange,
+                          Flexible(
+                            child: RegularText(
+                              text: 'Moto: ${motoPrice!.toStringAsFixed(0)} DT/h',
+                              fontSize: 12,
+                              color: AppColor.orange,
+                              maxLine: 1,
+                            ),
                           ),
                       ],
                     ),

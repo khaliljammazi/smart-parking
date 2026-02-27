@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../booking/booking_service.dart';
 import '../utils/constanst.dart';
 import 'qr_code_dialog.dart';
+import 'rating_dialog.dart';
 import 'package:intl/intl.dart';
 
 class BookingHistoryPage extends StatefulWidget {
@@ -115,6 +116,24 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         );
       }
     }
+  }
+
+  void _showRatingDialog(Map<String, dynamic> booking) {
+    final parking = booking['parking'] ?? {};
+    final parkingId = parking['_id']?.toString() ?? parking['id']?.toString() ?? '';
+    final parkingName = parking['name']?.toString() ?? 'Parking';
+
+    showDialog(
+      context: context,
+      builder: (context) => RatingDialog(
+        parkingId: parkingId,
+        parkingName: parkingName,
+      ),
+    ).then((rated) {
+      if (rated == true) {
+        _loadBookings();
+      }
+    });
   }
 
   @override
@@ -338,6 +357,29 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                     ],
                   ),
                 ],
+              ),
+
+            // Rate button for completed bookings
+            if (status == 'completed')
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showRatingDialog(booking),
+                    icon: const Icon(Icons.star, color: Colors.white),
+                    label: Text(
+                      booking['rating'] != null ? 'Modifier votre avis' : 'Évaluer ce parking',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber[700],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
               ),
           ],
         ),

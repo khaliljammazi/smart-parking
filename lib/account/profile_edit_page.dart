@@ -142,7 +142,10 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isUploadingAvatar = true);
 
     try {
-      final avatarUrl = await AuthService.uploadAvatar(pickedFile.path);
+      // Read bytes from XFile (works on both web and mobile)
+      final bytes = await pickedFile.readAsBytes();
+      final fileName = pickedFile.name;
+      final avatarUrl = await AuthService.uploadAvatar(bytes, fileName);
       if (avatarUrl != null && mounted) {
         // Refresh profile
         final authProvider = Provider.of<AuthProvider>(context, listen: false);

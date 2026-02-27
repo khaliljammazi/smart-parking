@@ -43,8 +43,8 @@ class _HomePageState extends State<HomePage> {
   // Try nearby with increasing radius, fallback to all parkings
   Future<List<ParkingModel>> _getNearbyWithFallback() async {
     if (lat == null || long == null) return [];
-    // Try with 50km radius first
-    var parkings = await BackendApi.getParkingSpots(lat!, long!, 50000);
+    // Try with 40km radius
+    var parkings = await BackendApi.getParkingSpots(lat!, long!, 40000);
     if (parkings.isEmpty) {
       // Fallback: get all parkings
       parkings = await BackendApi.getAllParkingSpots();
@@ -313,6 +313,21 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ],
                           ),
+                        ),
+                        // GPS location refresh button
+                        IconButton(
+                          icon: _locationLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location, color: Colors.white),
+                          tooltip: 'Détecter ma position',
+                          onPressed: _locationLoading ? null : _getCurrentLocation,
                         ),
                         // City selector button
                         IconButton(

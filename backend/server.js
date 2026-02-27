@@ -18,11 +18,12 @@ const vehicleRoutes = require('./src/routes/vehicle');
 const adminRoutes = require('./src/routes/admin');
 const qrRoutes = require('./src/routes/qr');
 const notificationRoutes = require('./src/routes/notification');
+const ratingRoutes = require('./src/routes/rating');
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: true, // Allow all origins (Flutter web runs on dynamic ports)
   credentials: true
 }));
 
@@ -53,6 +54,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

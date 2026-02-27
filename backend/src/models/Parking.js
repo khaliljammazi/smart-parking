@@ -176,7 +176,7 @@ const parkingSchema = new mongoose.Schema({
 });
 
 // Indexes
-parkingSchema.index({ 'coordinates': '2dsphere' });
+parkingSchema.index({ 'coordinates.latitude': 1, 'coordinates.longitude': 1 });
 parkingSchema.index({ 'address.city': 1 });
 parkingSchema.index({ isActive: 1 });
 parkingSchema.index({ owner: 1 });
@@ -207,18 +207,14 @@ parkingSchema.pre('save', async function(next) {
   next();
 });
 
-// Static method to find nearby parking
+// Static method to find nearby parking (bounding box approach)
 parkingSchema.statics.findNearby = function(longitude, latitude, maxDistance = 5000) {
+  const latDelta = maxDistance / 111000;
+  const lngDelta = maxDistance / (111000 * Math.cos(latitude * Math.PI / 180));
+
   return this.find({
-    'coordinates': {
-      $near: {
-        $geometry: {
-          type: 'Point',
-          coordinates: [longitude, latitude]
-        },
-        $maxDistance: maxDistance // in meters
-      }
-    },
+    'coordinates.latitude': { $gte: latitude - latDelta, $lte: latitude + latDelta },
+    'coordinates.longitude': { $gte: longitude - lngDelta, $lte: longitude + lngDelta },
     isActive: true
   });
 };

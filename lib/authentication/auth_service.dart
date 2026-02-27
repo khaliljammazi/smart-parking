@@ -195,8 +195,8 @@ class AuthService {
     }
   }
 
-  // Upload avatar image
-  static Future<String?> uploadAvatar(String filePath) async {
+  // Upload avatar image (web-compatible using bytes)
+  static Future<String?> uploadAvatar(List<int> imageBytes, String fileName) async {
     try {
       final token = await getToken();
       if (token == null) return null;
@@ -206,7 +206,11 @@ class AuthService {
         Uri.parse('$baseUrl/users/avatar'),
       );
       request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(await http.MultipartFile.fromPath('avatar', filePath));
+      request.files.add(http.MultipartFile.fromBytes(
+        'avatar',
+        imageBytes,
+        filename: fileName,
+      ));
 
       final streamResponse = await request.send();
       final response = await http.Response.fromStream(streamResponse);

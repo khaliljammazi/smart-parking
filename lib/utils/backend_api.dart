@@ -96,6 +96,27 @@ class BackendApi {
     );
   }
 
+  // Get a single parking by ID
+  static Future<ParkingModel?> getParkingById(String parkingId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/parking/$parkingId'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final parking = data['data']?['parking'];
+        if (parking != null) {
+          return _parseParkingModel(parking);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching parking by ID: $e');
+      return null;
+    }
+  }
+
   static Future<bool> createParking(Map<String, dynamic> parkingData) async {
     try {
       final response = await http.post(

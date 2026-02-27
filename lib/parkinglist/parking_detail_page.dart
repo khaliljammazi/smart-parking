@@ -7,8 +7,10 @@ import '../utils/role_helper.dart';
 import '../authentication/auth_provider.dart';
 import '../booking/booking_service.dart';
 import '../booking/qr_code_dialog.dart';
+import '../booking/rating_dialog.dart';
 import '../notification/backend_notification_service.dart';
 import '../vehicle/vehicle_service.dart';
+import '../utils/backend_api.dart';
 
 class ParkingDetailPage extends StatefulWidget {
   final ParkingModel parking;
@@ -21,9 +23,23 @@ class ParkingDetailPage extends StatefulWidget {
 
 class _ParkingDetailPageState extends State<ParkingDetailPage> {
   bool _isReserving = false;
+  late ParkingModel _parking;
+
+  @override
+  void initState() {
+    super.initState();
+    _parking = widget.parking;
+  }
+
+  Future<void> _refreshParking() async {
+    final updated = await BackendApi.getParkingById(_parking.id);
+    if (updated != null && mounted) {
+      setState(() => _parking = updated);
+    }
+  }
 
   Future<void> _makeReservation() async {
-    if (widget.parking.availableSpots <= 0) {
+    if (_parking.availableSpots <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Aucune place disponible'),
@@ -59,7 +75,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
 
     try {
       final result = await BookingService.createReservation(
-        parkingId: widget.parking.id,
+        parkingId: _parking.id,
         vehicleId: selectedVehicleId,
       );
 
@@ -70,7 +86,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
           // Send local notification for booking confirmation
           final notificationService = BackendNotificationService();
           await notificationService.showBookingConfirmation(
-            parkingName: widget.parking.name,
+            parkingName: _parking.name,
             date: DateTime.now().toString().split(' ')[0],
             time: DateTime.now().toString().split(' ')[1].substring(0, 5),
           );
@@ -210,7 +226,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
   @override
   Widget build(BuildContext context) {
     final favoritesProvider = Provider.of<FavoritesProvider>(context);
-    final isFavorite = favoritesProvider.isFavorite(widget.parking.id);
+    final isFavorite = favoritesProvider.isFavorite(_parking.id);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -228,7 +244,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                   color: isFavorite ? Colors.red : Colors.white,
                 ),
                 onPressed: () {
-                  favoritesProvider.toggleFavorite(widget.parking.id);
+                  favoritesProvider.toggleFavorite(_parking.id);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -245,7 +261,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
             ],
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                widget.parking.name,
+                _parking.name,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -299,8 +315,8 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                           _buildInfoItem(
                             icon: Icons.local_parking,
                             label: 'Places disponibles',
-                            value: '${widget.parking.availableSpots}',
-                            color: widget.parking.availableSpots > 0
+                            value: '${_parking.availableSpots}',
+                            color: _parking.availableSpots > 0
                                 ? Colors.green
                                 : Colors.red,
                           ),
@@ -312,7 +328,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                           _buildInfoItem(
                             icon: Icons.attach_money,
                             label: 'Prix',
-                            value: '${widget.parking.pricePerHour} DT/h',
+                            value: '${_parking.pricePerHour} DT/h',
                             color: AppColor.orange,
                           ),
                         ],
@@ -348,7 +364,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            widget.parking.address,
+                            _parking.address,
                             style: const TextStyle(
                               fontSize: 16,
                               color: Colors.black87,
@@ -373,7 +389,7 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                           const Icon(Icons.star, color: Colors.amber, size: 28),
                           const SizedBox(width: 8),
                           Text(
-                            widget.parking.rating.toStringAsFixed(1),
+                            _parking.rating.toStringAsFixed(1),
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -388,6 +404,28 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                               color: Colors.grey,
                             ),
                           ),
+                          const Spacer(),
+                          // Rate button for normal users
+                          if (!RoleHelper.isAdmin(Provider.of<AuthProvider>(context, listen: false).userProfile?['role']))
+                            TextButton.icon(
+                              onPressed: () async {
+                                final rated = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => RatingDialog(
+                                    parkingId: _parking.id,
+                                    parkingName: _parking.name,
+                                  ),
+                                );
+                                if (rated == true) {
+                                  await _refreshParking();
+                                }
+                              },
+                              icon: const Icon(Icons.rate_review, color: AppColor.orange),
+                              label: const Text(
+                                'Évaluer',
+                                style: TextStyle(color: AppColor.orange, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                         ],
                       ),
                     ),

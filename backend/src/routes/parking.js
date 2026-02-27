@@ -48,20 +48,18 @@ router.get('/', async (req, res) => {
 
     let query = { isActive: true };
 
-    // Location-based search
+    // Location-based search using bounding box (works with {latitude, longitude} schema)
     if (latitude && longitude) {
-      query = {
-        ...query,
-        coordinates: {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [parseFloat(longitude), parseFloat(latitude)]
-            },
-            $maxDistance: parseInt(radius)
-          }
-        }
-      };
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radiusMeters = parseInt(radius);
+      // 1 degree latitude ≈ 111km
+      const latDelta = radiusMeters / 111000;
+      // 1 degree longitude varies with latitude
+      const lngDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
+
+      query['coordinates.latitude'] = { $gte: lat - latDelta, $lte: lat + latDelta };
+      query['coordinates.longitude'] = { $gte: lng - lngDelta, $lte: lng + lngDelta };
     }
 
     // Availability filter
@@ -86,19 +84,19 @@ router.get('/', async (req, res) => {
     const pageNum = parseInt(page);
     const skip = (pageNum - 1) * limitNum;
 
-    // Create separate query for counting (without geospatial operators that require sorting)
+    // Create separate query for counting
     let countQuery = { isActive: true };
 
-    // Location-based search for count (use $geoWithin instead of $near)
+    // Location-based filter for count
     if (latitude && longitude) {
-      countQuery = {
-        ...countQuery,
-        coordinates: {
-          $geoWithin: {
-            $centerSphere: [[parseFloat(longitude), parseFloat(latitude)], parseInt(radius) / 6371000] // radius in radians
-          }
-        }
-      };
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radiusMeters = parseInt(radius);
+      const latDelta = radiusMeters / 111000;
+      const lngDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
+
+      countQuery['coordinates.latitude'] = { $gte: lat - latDelta, $lte: lat + latDelta };
+      countQuery['coordinates.longitude'] = { $gte: lng - lngDelta, $lte: lng + lngDelta };
     }
 
     // Apply other filters to count query
@@ -117,12 +115,8 @@ router.get('/', async (req, res) => {
 
     const total = await Parking.countDocuments(countQuery);
     let parkingsQuery = Parking.find(query)
-      .select('name address coordinates pricing availableSpots totalSpots features rating images isActive');
-
-    // Only apply sorting if not using geospatial query ($near automatically sorts by distance)
-    if (!(latitude && longitude)) {
-      parkingsQuery = parkingsQuery.sort({ 'rating.average': -1, createdAt: -1 });
-    }
+      .select('name address coordinates pricing availableSpots totalSpots features rating images isActive')
+      .sort({ 'rating.average': -1, createdAt: -1 });
 
     const parkings = await parkingsQuery
       .skip(skip)
