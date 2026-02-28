@@ -114,6 +114,31 @@ class BookingService {
     }
   }
 
+  // Get user's parking stats dashboard
+  static Future<Map<String, dynamic>?> getMyStats() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/bookings/my-stats'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Get my stats error: $e');
+      return null;
+    }
+  }
+
   // Get booking by ID
   static Future<Map<String, dynamic>?> getBookingById(String bookingId) async {
     try {

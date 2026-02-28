@@ -6,6 +6,7 @@ import 'profile_menu.dart';
 import '../../authentication/auth_provider.dart';
 import '../profile_edit_page.dart';
 import '../../booking/booking_history_page.dart';
+import '../../booking/parking_stats_page.dart';
 
 class ProfileBody extends StatelessWidget {
   const ProfileBody({super.key});
@@ -128,6 +129,8 @@ class ProfileBody extends StatelessWidget {
           const ProfileMenu(iconData: Icons.person, textData: 'Informations Personnelles', page: ProfilePage()),
           const Divider(height: 8),
           const ProfileMenu(iconData: Icons.history, textData: 'Historique des Réservations', page: BookingHistoryPage()),
+          const Divider(height: 8),
+          const ProfileMenu(iconData: Icons.bar_chart, textData: 'Mes Statistiques', page: ParkingStatsPage()),
           const Divider(height: 8),
           Builder(
             builder: (context) => ProfileMenu(

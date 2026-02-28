@@ -436,6 +436,138 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/bookings/active/count
+// @desc    Get count of active bookings for user
+// @access  Private
+router.get('/active/count', protect, async (req, res) => {
+  try {
+    const count = await Booking.countDocuments({
+      user: req.user._id,
+      status: 'active'
+    });
+
+    res.json({
+      success: true,
+      data: { activeBookingsCount: count }
+    });
+  } catch (error) {
+    console.error('Get active bookings count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/bookings/my-stats
+// @desc    Get user's parking statistics dashboard
+// @access  Private
+router.get('/my-stats', protect, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const bookings = await Booking.find({ user: userId })
+      .populate('parking', 'name address images rating')
+      .sort({ createdAt: -1 });
+
+    const completed = bookings.filter(b => b.status === 'completed');
+    const active = bookings.filter(b => b.status === 'active' || b.status === 'confirmed');
+    const cancelled = bookings.filter(b => b.status === 'cancelled');
+
+    const totalSpent = completed.reduce((sum, b) => sum + (b.pricing?.total || 0), 0);
+
+    let totalHours = 0;
+    for (const b of completed) {
+      const start = b.checkInTime || b.startTime;
+      const end = b.checkOutTime || b.endTime;
+      if (start && end) {
+        totalHours += Math.max(1, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60)));
+      }
+    }
+
+    const avgDuration = completed.length > 0 ? Math.round((totalHours / completed.length) * 10) / 10 : 0;
+
+    const parkingVisits = {};
+    for (const b of bookings) {
+      if (b.parking) {
+        const pid = b.parking._id.toString();
+        if (!parkingVisits[pid]) {
+          parkingVisits[pid] = {
+            parking: {
+              id: pid,
+              name: b.parking.name,
+              address: b.parking.address,
+              rating: b.parking.rating
+            },
+            visits: 0,
+            totalSpent: 0
+          };
+        }
+        parkingVisits[pid].visits++;
+        if (b.status === 'completed') {
+          parkingVisits[pid].totalSpent += (b.pricing?.total || 0);
+        }
+      }
+    }
+    const topParkings = Object.values(parkingVisits)
+      .sort((a, b) => b.visits - a.visits)
+      .slice(0, 5);
+
+    const monthly = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+      const monthBookings = completed.filter(b => {
+        const d = new Date(b.createdAt);
+        return d >= monthDate && d <= monthEnd;
+      });
+      monthly.push({
+        month: monthDate.toISOString().slice(0, 7),
+        label: monthDate.toLocaleDateString('fr-FR', { month: 'short' }),
+        spent: Math.round(monthBookings.reduce((s, b) => s + (b.pricing?.total || 0), 0) * 100) / 100,
+        count: monthBookings.length,
+        hours: monthBookings.reduce((s, b) => {
+          const start = b.checkInTime || b.startTime;
+          const end = b.checkOutTime || b.endTime;
+          if (start && end) return s + Math.max(1, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60)));
+          return s;
+        }, 0)
+      });
+    }
+
+    const weekdays = [0, 0, 0, 0, 0, 0, 0];
+    for (const b of bookings) {
+      const day = new Date(b.startTime).getDay();
+      weekdays[day]++;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalBookings: bookings.length,
+          completedBookings: completed.length,
+          activeBookings: active.length,
+          cancelledBookings: cancelled.length,
+          totalSpent: Math.round(totalSpent * 100) / 100,
+          totalHours,
+          avgDuration
+        },
+        topParkings,
+        monthly,
+        weekdayDistribution: weekdays
+      }
+    });
+  } catch (error) {
+    console.error('Get my stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 // @route   GET /api/bookings/:id
 // @desc    Get booking details
 // @access  Private
@@ -641,29 +773,6 @@ router.put('/:id/rate', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Rate booking error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// @route   GET /api/bookings/active/count
-// @desc    Get count of active bookings for user
-// @access  Private
-router.get('/active/count', protect, async (req, res) => {
-  try {
-    const count = await Booking.countDocuments({
-      user: req.user._id,
-      status: 'active'
-    });
-
-    res.json({
-      success: true,
-      data: { activeBookingsCount: count }
-    });
-  } catch (error) {
-    console.error('Get active bookings count error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
