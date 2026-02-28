@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -206,10 +207,18 @@ class AuthService {
         Uri.parse('$baseUrl/users/avatar'),
       );
       request.headers['Authorization'] = 'Bearer $token';
+      // Determine content type from file extension
+      final ext = fileName.split('.').last.toLowerCase();
+      final mimeSubtype = {
+        'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png',
+        'gif': 'gif', 'webp': 'webp',
+      }[ext] ?? 'jpeg';
+
       request.files.add(http.MultipartFile.fromBytes(
         'avatar',
         imageBytes,
         filename: fileName,
+        contentType: MediaType('image', mimeSubtype),
       ));
 
       final streamResponse = await request.send();

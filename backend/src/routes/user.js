@@ -30,7 +30,8 @@ const upload = multer({
     const allowed = /jpeg|jpg|png|gif|webp/;
     const ext = allowed.test(path.extname(file.originalname).toLowerCase());
     const mime = allowed.test(file.mimetype);
-    if (ext && mime) return cb(null, true);
+    // Accept if extension is valid and mime is either a known image type or octet-stream (web uploads)
+    if (ext && (mime || file.mimetype === 'application/octet-stream')) return cb(null, true);
     cb(new Error('Only image files are allowed'));
   },
 });

@@ -119,6 +119,99 @@ class ProfileBody extends StatelessWidget {
     );
   }
 
+  void _showReportProblemDialog(BuildContext context) {
+    String selectedCategory = 'Réservation';
+    final categories = ['Réservation', 'Paiement', 'Parking', 'Application', 'Compte', 'Autre'];
+    final descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.bug_report, color: Colors.orange.shade700, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Signaler un problème', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Catégorie', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categories.map((cat) {
+                    final isSelected = cat == selectedCategory;
+                    return ChoiceChip(
+                      label: Text(cat, style: TextStyle(fontSize: 13, color: isSelected ? Colors.white : Colors.black87)),
+                      selected: isSelected,
+                      selectedColor: Colors.orange.shade700,
+                      onSelected: (_) => setDialogState(() => selectedCategory = cat),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Text('Description', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Décrivez le problème rencontré...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('Envoyer'),
+              onPressed: () async {
+                final desc = descriptionController.text.trim();
+                if (desc.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Veuillez décrire le problème'), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                final subject = Uri.encodeComponent('Problème - $selectedCategory');
+                final body = Uri.encodeComponent('Catégorie: $selectedCategory\n\nDescription:\n$desc');
+                final uri = Uri.parse('mailto:Balssem.Zoghbi@keyrus.com?subject=$subject&body=$body');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Merci pour votre signalement !'), backgroundColor: Colors.green),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -141,6 +234,14 @@ class ProfileBody extends StatelessWidget {
           ),
           const Divider(height: 8),
           const ProfileMenu(iconData: Icons.settings, textData: 'Paramètres'),
+          const Divider(height: 8),
+          Builder(
+            builder: (context) => ProfileMenu(
+              iconData: Icons.bug_report,
+              textData: 'Signaler un problème',
+              onTapOverride: () => _showReportProblemDialog(context),
+            ),
+          ),
           const Divider(height: 8),
           InkWell(
             onTap: () => _handleLogout(context),
