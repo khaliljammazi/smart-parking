@@ -368,6 +368,30 @@ router.delete('/vehicles/:id', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/fcm-token
+// @desc    Register FCM token for push notifications
+// @access  Private
+router.post('/fcm-token', protect, async (req, res) => {
+  try {
+    const { fcmToken, platform } = req.body;
+    if (!fcmToken) return res.status(400).json({ success: false, message: 'Token required' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.deviceTokens = user.deviceTokens || [];
+    if (!user.deviceTokens.some(t => t.token === fcmToken)) {
+      user.deviceTokens.push({ token: fcmToken, platform: platform || 'unknown' });
+      await user.save();
+    }
+
+    res.json({ success: true, message: 'FCM token registered' });
+  } catch (err) {
+    console.error('Register FCM token error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   PUT /api/users/vehicles/:id/default
 // @desc    Set vehicle as default
 // @access  Private

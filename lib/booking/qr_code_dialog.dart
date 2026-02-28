@@ -3,8 +3,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:map_launcher/map_launcher.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher_string.dart';
+import '../utils/download_helper.dart';
 import '../booking/booking_service.dart';
 import '../utils/constanst.dart';
 
@@ -40,20 +41,12 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
     setState(() => _isDownloading = true);
 
     try {
-      final imageFile = await _screenshotController.capture();
-      
-      if (imageFile != null) {
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'qr_code_${widget.booking['_id'] ?? DateTime.now().millisecondsSinceEpoch}.png';
-        final file = File('${directory.path}/$fileName');
-        await file.writeAsBytes(imageFile);
+      final imageBytes = await _screenshotController.capture();
 
-        // Share the file
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          subject: 'QR Code de Réservation',
-          text: 'Voici votre QR code pour le parking',
-        );
+      if (imageBytes != null) {
+        final fileName = 'qr_code_${widget.booking['_id'] ?? DateTime.now().millisecondsSinceEpoch}.png';
+        // downloadBytes will use a web implementation on web and save+share on mobile
+        await downloadBytes(imageBytes, fileName);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -107,14 +100,19 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
 
     try {
       final availableMaps = await MapLauncher.installedMaps;
-      if (availableMaps.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Aucune application de navigation installée'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      if (kIsWeb || availableMaps.isEmpty) {
+        final googleUrl = 'https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}';
+        if (await canLaunchUrlString(googleUrl)) {
+          await launchUrlString(googleUrl);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Impossible d\'ouvrir la navigation'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
         return;
       }

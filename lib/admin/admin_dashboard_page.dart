@@ -224,6 +224,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               MaterialPageRoute(builder: (context) => const ReportsPage()),
             );
           }),
+        // Support Tickets / Signalements - Only for full admins
+        if (isFullAdmin)
+          _buildActionCard(
+            'Signalements',
+            Icons.report_problem,
+            Colors.redAccent,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ReportsPage(initialTab: 3)),
+            ),
+          ),
         // Manage Vehicles - For admins
         if (isFullAdmin)
           _buildActionCard(

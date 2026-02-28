@@ -6,6 +6,8 @@ const Parking = require('../models/Parking');
 const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const schedule = require('node-schedule');
+const pushUtil = require('../utils/push');
 
 const router = express.Router();
 
@@ -246,6 +248,40 @@ router.post('/reserve', protect, async (req, res) => {
       sendReservationEmail(user, populatedBooking, parking, vehicle);
     }
 
+    // Schedule push reminder 30 minutes before start time
+    try {
+      const reminderTime = new Date(populatedBooking.startTime.getTime() - 30 * 60 * 1000);
+      if (reminderTime > new Date()) {
+        schedule.scheduleJob(`reminder_${booking._id}`, reminderTime, async () => {
+          const u = await User.findById(booking.user);
+          const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+          if (tokens.length) {
+            await pushUtil.sendPushToTokens(tokens, {
+              notification: { title: 'Rappel réservation', body: `Votre place à ${parking.name} commence dans 30 minutes.` },
+              data: { bookingId: booking._id.toString(), type: 'reminder' }
+            });
+          }
+        });
+      }
+
+      // Schedule end-time notification
+      const endTime = new Date(populatedBooking.endTime);
+      if (endTime > new Date()) {
+        schedule.scheduleJob(`expiry_${booking._id}`, endTime, async () => {
+          const u = await User.findById(booking.user);
+          const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+          if (tokens.length) {
+            await pushUtil.sendPushToTokens(tokens, {
+              notification: { title: 'Fin de réservation', body: `Votre réservation à ${parking.name} est terminée.` },
+              data: { bookingId: booking._id.toString(), type: 'expiry' }
+            });
+          }
+        });
+      }
+    } catch (schedErr) {
+      console.error('Scheduling push error:', schedErr);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Reservation created successfully',
@@ -376,6 +412,39 @@ router.post('/', protect, createBookingValidation, async (req, res) => {
       { path: 'parking', select: 'name address coordinates pricing' },
       { path: 'vehicle', select: 'make model licensePlate' }
     ]);
+
+    // Schedule push reminder 30 minutes before start time
+    try {
+      const reminderTime = new Date(booking.startTime.getTime() - 30 * 60 * 1000);
+      if (reminderTime > new Date()) {
+        schedule.scheduleJob(`reminder_${booking._id}`, reminderTime, async () => {
+          const u = await User.findById(booking.user);
+          const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+          if (tokens.length) {
+            await pushUtil.sendPushToTokens(tokens, {
+              notification: { title: 'Rappel réservation', body: `Votre place à ${booking.parking.name} commence dans 30 minutes.` },
+              data: { bookingId: booking._id.toString(), type: 'reminder' }
+            });
+          }
+        });
+      }
+
+      const endTime = new Date(booking.endTime);
+      if (endTime > new Date()) {
+        schedule.scheduleJob(`expiry_${booking._id}`, endTime, async () => {
+          const u = await User.findById(booking.user);
+          const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+          if (tokens.length) {
+            await pushUtil.sendPushToTokens(tokens, {
+              notification: { title: 'Fin de réservation', body: `Votre réservation à ${booking.parking.name} est terminée.` },
+              data: { bookingId: booking._id.toString(), type: 'expiry' }
+            });
+          }
+        });
+      }
+    } catch (schedErr) {
+      console.error('Scheduling push error:', schedErr);
+    }
 
     res.status(201).json({
       success: true,
@@ -684,6 +753,19 @@ router.put('/:id/checkin', protect, async (req, res) => {
     }
 
     await booking.checkIn();
+    // Send push confirming check-in
+    try {
+      const u = await User.findById(booking.user);
+      const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+      if (tokens.length) {
+        await pushUtil.sendPushToTokens(tokens, {
+          notification: { title: 'Check-in confirmé', body: `Vous êtes bien enregistré pour votre réservation.` },
+          data: { bookingId: booking._id.toString(), type: 'checkin' }
+        });
+      }
+    } catch (pushErr) {
+      console.error('Check-in push error:', pushErr);
+    }
 
     res.json({
       success: true,

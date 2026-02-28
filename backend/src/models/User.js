@@ -113,6 +113,13 @@ const userSchema = new mongoose.Schema({
     ref: 'Parking'
   }],
 
+  // Device tokens for push notifications
+  deviceTokens: [{
+    token: String,
+    platform: String,
+    createdAt: { type: Date, default: Date.now }
+  }],
+
   // Account Status
   isActive: {
     type: Boolean,

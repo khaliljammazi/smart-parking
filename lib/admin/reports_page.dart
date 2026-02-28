@@ -6,7 +6,8 @@ import '../utils/constanst.dart';
 import 'admin_service.dart';
 
 class ReportsPage extends StatefulWidget {
-  const ReportsPage({super.key});
+  final int initialTab;
+  const ReportsPage({super.key, this.initialTab = 0});
 
   @override
   State<ReportsPage> createState() => _ReportsPageState();
@@ -22,7 +23,7 @@ class _ReportsPageState extends State<ReportsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
     _loadReportData();
   }
 
@@ -37,11 +38,13 @@ class _ReportsPageState extends State<ReportsPage>
     try {
       final dashboard = await AdminService.getDashboardData();
       final revenue = await AdminService.getRevenueData();
+      final tickets = await AdminService.getSupportTickets();
 
       if (mounted) {
         setState(() {
           _dashboardData = dashboard;
           _revenueData = revenue;
+          _supportTickets = tickets;
           _isLoading = false;
         });
       }
@@ -53,6 +56,57 @@ class _ReportsPageState extends State<ReportsPage>
         );
       }
     }
+  }
+
+  Map<String, dynamic>? _supportTickets;
+
+  Widget _buildSupportTickets() {
+    final tickets = (_supportTickets?['tickets'] as List<dynamic>?) ?? [];
+
+    return RefreshIndicator(
+      onRefresh: _loadReportData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: tickets.length,
+        itemBuilder: (context, index) {
+          final t = tickets[index];
+          final user = t['user'] ?? {};
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: ListTile(
+              title: Text('${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Catégorie: ${t['category'] ?? 'Autre'}'),
+                  const SizedBox(height: 6),
+                  Text(t['description'] ?? '', maxLines: 3, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 6),
+                  Text('Statut: ${t['status'] ?? 'open'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+              isThreeLine: true,
+              trailing: PopupMenuButton<String>(
+                onSelected: (value) async {
+                  final ok = await AdminService.updateSupportTicketStatus(t['_id'], value);
+                  if (ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Statut mis à jour')));
+                    _loadReportData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur lors de la mise à jour'), backgroundColor: Colors.red));
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'in_progress', child: Text('En cours')),
+                  const PopupMenuItem(value: 'resolved', child: Text('Résolu')),
+                  const PopupMenuItem(value: 'closed', child: Text('Fermé')),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _exportPDF() async {
@@ -197,6 +251,7 @@ class _ReportsPageState extends State<ReportsPage>
             Tab(text: 'Général', icon: Icon(Icons.dashboard)),
             Tab(text: 'Revenus', icon: Icon(Icons.monetization_on)),
             Tab(text: 'Réservations', icon: Icon(Icons.book_online)),
+            Tab(text: 'Signalements', icon: Icon(Icons.report_problem)),
           ],
         ),
         actions: [
@@ -220,6 +275,7 @@ class _ReportsPageState extends State<ReportsPage>
                 _buildGeneralReport(),
                 _buildRevenueReport(),
                 _buildBookingsReport(),
+                _buildSupportTickets(),
               ],
             ),
     );

@@ -286,6 +286,71 @@ router.delete('/users/:id', protect, requireAdmin, async (req, res) => {
   }
 });
 
+// Support tickets management for admins
+const SupportTicket = require('../models/SupportTicket');
+
+// @route   GET /api/admin/support/tickets
+// @desc    List support tickets (admin)
+// @access  Private (Admin only)
+router.get('/support/tickets', protect, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+    const query = {};
+    if (status) query.status = status;
+
+    const tickets = await SupportTicket.find(query)
+      .populate('user', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((page - 1) * parseInt(limit));
+
+    const total = await SupportTicket.countDocuments(query);
+
+    res.json({ success: true, data: { tickets, total, page: parseInt(page), limit: parseInt(limit) } });
+  } catch (err) {
+    console.error('Get support tickets error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/support/tickets/:id
+// @desc    Get support ticket details
+// @access  Private (Admin only)
+router.get('/support/tickets/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const ticket = await SupportTicket.findById(req.params.id).populate('user', 'firstName lastName email');
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
+    res.json({ success: true, data: ticket });
+  } catch (err) {
+    console.error('Get support ticket error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/support/tickets/:id/status
+// @desc    Update support ticket status
+// @access  Private (Admin only)
+router.put('/support/tickets/:id/status', protect, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const ticket = await SupportTicket.findById(req.params.id);
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
+
+    ticket.status = status;
+    ticket.handledBy = req.user._id;
+    await ticket.save();
+
+    res.json({ success: true, message: 'Ticket updated', data: ticket });
+  } catch (err) {
+    console.error('Update ticket status error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   PUT /api/admin/users/:id/role
 // @desc    Update user role
 // @access  Private (Super Admin only)

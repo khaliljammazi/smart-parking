@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:map_launcher/map_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher_string.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 import '../utils/favorites_provider.dart';
@@ -42,16 +44,17 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
 
   Future<void> _navigateToParking() async {
     try {
+      // On web, open Google Maps in the browser directly
+      if (kIsWeb) {
+        final url = 'https://www.google.com/maps/search/?api=1&query=${_parking.latitude},${_parking.longitude}';
+        await launchUrlString(url);
+        return;
+      }
       final availableMaps = await MapLauncher.installedMaps;
       if (availableMaps.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Aucune application de navigation install\u00e9e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        // Fallback to opening Google Maps URL if no native apps installed
+        final url = 'https://www.google.com/maps/search/?api=1&query=${_parking.latitude},${_parking.longitude}';
+        await launchUrlString(url);
         return;
       }
 

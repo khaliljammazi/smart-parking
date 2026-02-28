@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+
+import '../../authentication/auth_service.dart';
 import 'profile_header.dart';
 import 'profile_menu.dart';
 import '../../authentication/auth_provider.dart';
@@ -8,9 +13,14 @@ import '../profile_edit_page.dart';
 import '../../booking/booking_history_page.dart';
 import '../../booking/parking_stats_page.dart';
 
-class ProfileBody extends StatelessWidget {
+class ProfileBody extends StatefulWidget {
   const ProfileBody({super.key});
 
+  @override
+  State<ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends State<ProfileBody> {
   Future<void> _handleLogout(BuildContext context) async {
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -178,7 +188,7 @@ class ProfileBody extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Annuler'),
             ),
-            ElevatedButton.icon(
+              ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange.shade700,
                 foregroundColor: Colors.white,
@@ -186,7 +196,7 @@ class ProfileBody extends StatelessWidget {
               ),
               icon: const Icon(Icons.send, size: 18),
               label: const Text('Envoyer'),
-              onPressed: () async {
+                onPressed: () async {
                 final desc = descriptionController.text.trim();
                 if (desc.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -194,16 +204,35 @@ class ProfileBody extends StatelessWidget {
                   );
                   return;
                 }
-                final subject = Uri.encodeComponent('Problème - $selectedCategory');
-                final body = Uri.encodeComponent('Catégorie: $selectedCategory\n\nDescription:\n$desc');
-                final uri = Uri.parse('mailto:Balssem.Zoghbi@keyrus.com?subject=$subject&body=$body');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
+                // Send report to backend so email is delivered via server config
+                try {
+                  final token = await AuthService.getToken();
+                  if (token == null) throw Exception('Not authenticated');
+
+                  final response = await http.post(
+                    Uri.parse('${AuthService.baseUrl}/support/report'),
+                    headers: {
+                      'Authorization': 'Bearer $token',
+                      'Content-Type': 'application/json'
+                    },
+                    body: json.encode({ 'category': selectedCategory, 'description': desc })
+                  );
+
+                  if (response.statusCode == 200) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Merci pour votre signalement !'), backgroundColor: Colors.green),
+                    );
+                  } else {
+                    throw Exception('Failed to send');
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur lors de l\'envoi: $e'), backgroundColor: Colors.red),
+                    );
+                  }
                 }
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Merci pour votre signalement !'), backgroundColor: Colors.green),
-                );
               },
             ),
           ],
@@ -211,7 +240,6 @@ class ProfileBody extends StatelessWidget {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(

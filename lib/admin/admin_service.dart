@@ -285,4 +285,63 @@ class AdminService {
       return false;
     }
   }
+
+  // Get support tickets (admin)
+  static Future<Map<String, dynamic>?> getSupportTickets({
+    int page = 1,
+    int limit = 20,
+    String? status,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (status != null) 'status': status,
+      };
+
+      final uri = Uri.parse('$baseUrl/admin/support/tickets').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Get support tickets error: $e');
+      return null;
+    }
+  }
+
+  // Update support ticket status
+  static Future<bool> updateSupportTicketStatus(String ticketId, String status) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/support/tickets/$ticketId/status'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({ 'status': status }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Update support ticket status error: $e');
+      return false;
+    }
+  }
 }
