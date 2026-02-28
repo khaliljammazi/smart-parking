@@ -39,12 +39,12 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   late bool _showAvailableOnly;
 
   final List<String> _amenities = [
-    'Covered',
-    'Security',
-    'EV Charging',
-    '24/7 Access',
-    'Handicap Accessible',
-    'Valet',
+    'Couvert',
+    'S\u00e9curit\u00e9',
+    'Recharge EV',
+    'Acc\u00e8s 24/7',
+    'Acc\u00e8s handicap\u00e9',
+    'Voiturier',
   ];
 
   @override
@@ -96,7 +96,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Filters',
+                      'Filtres',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -105,7 +105,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     ),
                     TextButton(
                       onPressed: _resetFilters,
-                      child: const Text('Reset'),
+                      child: const Text('R\u00e9initialiser'),
                     ),
                   ],
                 ),
@@ -118,7 +118,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     // Price Range
-                    _buildSectionTitle('Price Range (DT/hour)', isDark),
+                    _buildSectionTitle('Fourchette de prix (DT/h)', isDark),
                     const SizedBox(height: 8),
                     RangeSlider(
                       values: _priceRange,
@@ -146,7 +146,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     const SizedBox(height: 24),
 
                     // Distance
-                    _buildSectionTitle('Maximum Distance', isDark),
+                    _buildSectionTitle('Distance maximale', isDark),
                     const SizedBox(height: 8),
                     Slider(
                       value: _maxDistance,
@@ -172,7 +172,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     const SizedBox(height: 24),
 
                     // Rating
-                    _buildSectionTitle('Minimum Rating', isDark),
+                    _buildSectionTitle('Note minimale', isDark),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -192,7 +192,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     const SizedBox(height: 24),
 
                     // Amenities
-                    _buildSectionTitle('Amenities', isDark),
+                    _buildSectionTitle('\u00c9quipements', isDark),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -226,14 +226,14 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     // Available Only Toggle
                     SwitchListTile(
                       title: Text(
-                        'Show Available Only',
+                        'Disponibles uniquement',
                         style: TextStyle(
                           color: isDark ? Colors.white : Colors.black87,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       subtitle: Text(
-                        'Hide fully occupied parkings',
+                        'Masquer les parkings complets',
                         style: TextStyle(
                           color: isDark ? Colors.white54 : Colors.black54,
                         ),
@@ -273,7 +273,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                         ),
                       ),
                       child: const Text(
-                        'Apply Filters',
+                        'Appliquer les filtres',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -336,12 +336,12 @@ class SortBottomSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final sortOptions = [
-      {'value': 'distance', 'label': 'Distance (Nearest)', 'icon': Icons.near_me},
-      {'value': 'price_low', 'label': 'Price (Low to High)', 'icon': Icons.arrow_upward},
-      {'value': 'price_high', 'label': 'Price (High to Low)', 'icon': Icons.arrow_downward},
-      {'value': 'rating', 'label': 'Rating (Highest)', 'icon': Icons.star},
-      {'value': 'availability', 'label': 'Availability', 'icon': Icons.check_circle},
-      {'value': 'name', 'label': 'Name (A-Z)', 'icon': Icons.sort_by_alpha},
+      {'value': 'distance', 'label': 'Distance (le plus proche)', 'icon': Icons.near_me},
+      {'value': 'price_low', 'label': 'Prix (croissant)', 'icon': Icons.arrow_upward},
+      {'value': 'price_high', 'label': 'Prix (d\u00e9croissant)', 'icon': Icons.arrow_downward},
+      {'value': 'rating', 'label': 'Note (meilleure)', 'icon': Icons.star},
+      {'value': 'availability', 'label': 'Disponibilit\u00e9', 'icon': Icons.check_circle},
+      {'value': 'name', 'label': 'Nom (A-Z)', 'icon': Icons.sort_by_alpha},
     ];
 
     return Container(
@@ -373,7 +373,7 @@ class SortBottomSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Sort By',
+                  'Trier par',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,

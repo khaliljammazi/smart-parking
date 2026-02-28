@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:map_launcher/map_launcher.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
 import '../utils/favorites_provider.dart';
@@ -8,6 +9,7 @@ import '../authentication/auth_provider.dart';
 import '../booking/booking_service.dart';
 import '../booking/qr_code_dialog.dart';
 import '../booking/rating_dialog.dart';
+import '../booking/parking_reviews_widget.dart';
 import '../notification/backend_notification_service.dart';
 import '../vehicle/vehicle_service.dart';
 import '../utils/backend_api.dart';
@@ -35,6 +37,70 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
     final updated = await BackendApi.getParkingById(_parking.id);
     if (updated != null && mounted) {
       setState(() => _parking = updated);
+    }
+  }
+
+  Future<void> _navigateToParking() async {
+    try {
+      final availableMaps = await MapLauncher.installedMaps;
+      if (availableMaps.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Aucune application de navigation install\u00e9e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (availableMaps.length == 1) {
+        await availableMaps.first.showDirections(
+          destination: Coords(_parking.latitude, _parking.longitude),
+          destinationTitle: _parking.name,
+        );
+      } else {
+        if (!mounted) return;
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Choisir l\'application',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ...availableMaps.map((map) => ListTile(
+                  leading: Icon(Icons.map, color: AppColor.navy),
+                  title: Text(map.mapName),
+                  onTap: () {
+                    Navigator.pop(context);
+                    map.showDirections(
+                      destination: Coords(_parking.latitude, _parking.longitude),
+                      destinationTitle: _parking.name,
+                    );
+                  },
+                )),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur de navigation: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -432,6 +498,25 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                   ),
                   const SizedBox(height: 24),
 
+                  // Navigate Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _navigateToParking(),
+                      icon: const Icon(Icons.directions, color: AppColor.navy),
+                      label: const Text(
+                        'Naviguer vers ce parking',
+                        style: TextStyle(color: AppColor.navy, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColor.navy, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Reserve Button (only for normal users, not admins)
                   if (!RoleHelper.isAdmin(Provider.of<AuthProvider>(context, listen: false).userProfile?['role']))
                   SizedBox(
@@ -464,6 +549,13 @@ class _ParkingDetailPageState extends State<ParkingDetailPage> {
                               ],
                             ),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Reviews from other users
+                  ParkingReviewsWidget(
+                    parkingId: _parking.id,
+                    currentRating: _parking.rating,
                   ),
                   const SizedBox(height: 16),
 

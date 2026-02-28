@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:map_launcher/map_launcher.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../booking/booking_service.dart';
@@ -75,6 +76,96 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
     } finally {
       if (mounted) {
         setState(() => _isDownloading = false);
+      }
+    }
+  }
+
+  Future<void> _navigateToParking() async {
+    final parkingData = widget.booking['parking'];
+    if (parkingData == null) return;
+
+    final coords = parkingData['coordinates'];
+    double? lat;
+    double? lng;
+
+    if (coords is Map) {
+      lat = (coords['latitude'] ?? 0).toDouble();
+      lng = (coords['longitude'] ?? 0).toDouble();
+    }
+
+    if (lat == null || lng == null || (lat == 0 && lng == 0)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Coordonnées du parking non disponibles'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final availableMaps = await MapLauncher.installedMaps;
+      if (availableMaps.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Aucune application de navigation installée'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final parkingName = _extractString(parkingData['name'], 'Parking');
+
+      if (availableMaps.length == 1) {
+        await availableMaps.first.showDirections(
+          destination: Coords(lat, lng),
+          destinationTitle: parkingName,
+        );
+      } else {
+        if (!mounted) return;
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Choisir l\'application',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ...availableMaps.map((map) => ListTile(
+                  leading: const Icon(Icons.map, color: AppColor.navy),
+                  title: Text(map.mapName),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    map.showDirections(
+                      destination: Coords(lat!, lng!),
+                      destinationTitle: parkingName,
+                    );
+                  },
+                )),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -282,6 +373,27 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+
+            // Navigate button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _navigateToParking(),
+                icon: const Icon(Icons.directions, color: AppColor.navy),
+                label: const Text(
+                  'Naviguer vers le parking',
+                  style: TextStyle(color: AppColor.navy, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColor.navy, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

@@ -38,6 +38,50 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _checkFavoriteAvailability();
+  }
+
+  /// Feature 4: Check if any favorite parking has low availability
+  Future<void> _checkFavoriteAvailability() async {
+    await Future.delayed(const Duration(seconds: 3)); // Wait for data to load
+    if (!mounted) return;
+
+    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+    final favoriteIds = favoritesProvider.favoriteIds;
+    if (favoriteIds.isEmpty) return;
+
+    try {
+      final allParkings = await BackendApi.getAllParkingSpots();
+      final lowAvailability = allParkings.where((p) =>
+        favoriteIds.contains(p.id) &&
+        p.availableSpots > 0 &&
+        p.availableSpots <= 3
+      ).toList();
+
+      if (lowAvailability.isNotEmpty && mounted) {
+        final names = lowAvailability.map((p) => p.name).join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '⚠️ Places limitées: $names',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange[800],
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   // Try nearby with increasing radius, fallback to all parkings

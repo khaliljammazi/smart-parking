@@ -200,7 +200,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                   onChanged: _onSearch,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Search parking...',
+                    hintText: 'Rechercher un parking...',
                     hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
                     prefixIcon: const Icon(Icons.search, color: Colors.white70),
                     suffixIcon: _searchQuery.isNotEmpty
@@ -229,7 +229,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                       child: OutlinedButton.icon(
                         onPressed: _showFilters,
                         icon: const Icon(Icons.filter_list, size: 20),
-                        label: Text(_filters != null ? 'Filters Active' : 'Filters'),
+                        label: Text(_filters != null ? 'Filtres actifs' : 'Filtres'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(
@@ -244,7 +244,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                       child: OutlinedButton.icon(
                         onPressed: _showSort,
                         icon: const Icon(Icons.sort, size: 20),
-                        label: Text(_sortBy != null ? 'Sorted' : 'Sort'),
+                        label: Text(_sortBy != null ? 'Trié' : 'Trier'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(
@@ -281,7 +281,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                       });
                       _applyFiltersAndSort();
                     },
-                    child: const Text('Clear All'),
+                    child: const Text('Tout effacer'),
                   ),
               ],
             ),
@@ -305,7 +305,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No parking found',
+                              'Aucun parking trouvé',
                               style: TextStyle(
                                 fontSize: 18,
                                 color: isDark ? Colors.white54 : Colors.black54,
@@ -313,7 +313,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Try adjusting your filters',
+                              'Essayez d\'ajuster vos filtres',
                               style: TextStyle(
                                 color: isDark ? Colors.white38 : Colors.black38,
                               ),
@@ -410,7 +410,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
                         ),
                         const SizedBox(width: 8),
                         _buildChip(
-                          '${spot.availableSpots} spots',
+                          '${spot.availableSpots} places',
                           Icons.local_parking,
                           spot.availableSpots > 0 ? Colors.blue : Colors.red,
                         ),

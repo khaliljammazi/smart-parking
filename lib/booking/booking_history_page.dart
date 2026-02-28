@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../booking/booking_service.dart';
 import '../utils/constanst.dart';
 import 'qr_code_dialog.dart';
@@ -134,6 +135,34 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         _loadBookings();
       }
     });
+  }
+
+  void _shareBooking(Map<String, dynamic> booking) {
+    final parking = booking['parking'] ?? {};
+    final parkingName = parking['name']?.toString() ?? 'Parking';
+    final status = _getStatusText(booking['status'] ?? 'pending');
+    final startTime = booking['startTime'] != null
+        ? DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(booking['startTime']))
+        : '';
+
+    final address = parking['address'];
+    String addressStr = '';
+    if (address is Map) {
+      addressStr = '${address['street'] ?? ''}, ${address['city'] ?? ''}'.trim();
+    } else if (address is String) {
+      addressStr = address;
+    }
+
+    final bookingRef = booking['_id']?.toString().substring(0, 8) ?? '';
+
+    final text = '\u{1f697} R\u00e9servation Smart Parking\n'
+        '\u{1f3e2} Parking: $parkingName\n'
+        '${addressStr.isNotEmpty ? '\u{1f4cd} Adresse: $addressStr\n' : ''}'
+        '${startTime.isNotEmpty ? '\u{1f552} Date: $startTime\n' : ''}'
+        '\u{1f4cb} Statut: $status\n'
+        '\u{1f4c4} R\u00e9f: #$bookingRef';
+
+    Share.share(text, subject: 'Ma r\u00e9servation - $parkingName');
   }
 
   @override
@@ -381,6 +410,26 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                   ),
                 ),
               ),
+
+            // Share button
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _shareBooking(booking),
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Partager'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColor.navy,
+                    side: const BorderSide(color: AppColor.navy),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
