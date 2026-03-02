@@ -253,7 +253,7 @@ class _ReportsPageState extends State<ReportsPage>
             Tab(text: 'Réservations', icon: Icon(Icons.book_online)),
             Tab(text: 'Signalements', icon: Icon(Icons.report_problem)),
           ],
-        ),
+        ), 
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
