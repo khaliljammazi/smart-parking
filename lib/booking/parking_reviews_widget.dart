@@ -343,6 +343,50 @@ class _ParkingReviewsWidgetState extends State<ParkingReviewsWidget> {
               )).toList(),
             ),
           ],
+          // Admin/Owner reply
+          if (review['adminReply'] != null && review['adminReply']['text'] != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border(left: BorderSide(color: AppColor.navy, width: 3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.reply, size: 14, color: AppColor.navy),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Réponse du gestionnaire',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColor.navy,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (review['adminReply']['repliedAt'] != null)
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(
+                            DateTime.parse(review['adminReply']['repliedAt']),
+                          ),
+                          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    review['adminReply']['text'],
+                    style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

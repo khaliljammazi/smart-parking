@@ -10,6 +10,8 @@ import 'admin_qr_scan_page.dart';
 import 'reports_page.dart';
 import '../parkinglist/parking_list_page.dart';
 import 'admin_vehicle_dashboard_page.dart';
+import 'manage_bookings_page.dart';
+import 'review_analytics_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -244,6 +246,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             () => Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const AdminVehicleDashboardPage()),
+            ),
+          ),
+        // Manage Bookings - For admins / super admins
+        if (isFullAdmin)
+          _buildActionCard(
+            'Gérer les réservations',
+            Icons.book_online,
+            Colors.deepOrange,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ManageBookingsPage()),
+            ),
+          ),
+        // Review Analytics - For admins
+        if (isFullAdmin)
+          _buildActionCard(
+            'Analytique des avis',
+            Icons.analytics_outlined,
+            Colors.teal,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ReviewAnalyticsPage()),
             ),
           ),
       ],

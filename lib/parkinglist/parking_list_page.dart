@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../model/parking_model.dart';
 import '../utils/constanst.dart';
@@ -30,11 +32,51 @@ class _ParkingListPageState extends State<ParkingListPage> {
   String? _sortBy;
   final _searchController = TextEditingController();
   final List<String> _recentSearches = [];
+  double? _userLat;
+  double? _userLng;
 
   @override
   void initState() {
     super.initState();
+    _getUserLocation();
     _loadParkings();
+  }
+
+  /// Haversine distance in km
+  double _haversine(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371.0;
+    final dLat = (lat2 - lat1) * pi / 180;
+    final dLon = (lon2 - lon1) * pi / 180;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
+        sin(dLon / 2) * sin(dLon / 2);
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a));
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      if (mounted) {
+        setState(() {
+          _userLat = pos.latitude;
+          _userLng = pos.longitude;
+        });
+        _computeDistances();
+        _applyFiltersAndSort();
+      }
+    } catch (_) {}
+  }
+
+  void _computeDistances() {
+    if (_userLat == null || _userLng == null) return;
+    for (final p in _parkings) {
+      p.distance = _haversine(_userLat!, _userLng!, p.latitude, p.longitude);
+    }
   }
 
   @override
@@ -53,6 +95,7 @@ class _ParkingListPageState extends State<ParkingListPage> {
           _filteredParkings = parkings;
           _isLoading = false;
         });
+        _computeDistances();
         _applyFiltersAndSort();
       }
     } catch (e) {
@@ -90,6 +133,10 @@ class _ParkingListPageState extends State<ParkingListPage> {
       if (_filters!['availableOnly'] == true) {
         result = result.where((p) => p.availableSpots > 0).toList();
       }
+      if (_filters!['maxDistance'] != null && _userLat != null) {
+        final maxDist = (_filters!['maxDistance'] as num).toDouble();
+        result = result.where((p) => p.distance <= maxDist).toList();
+      }
     }
 
     // Apply sort
@@ -109,6 +156,9 @@ class _ParkingListPageState extends State<ParkingListPage> {
           break;
         case 'name':
           result.sort((a, b) => a.name.compareTo(b.name));
+          break;
+        case 'distance':
+          result.sort((a, b) => a.distance.compareTo(b.distance));
           break;
       }
     }

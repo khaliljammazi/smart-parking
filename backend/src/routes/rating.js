@@ -113,6 +113,7 @@ router.get('/:parkingId', async (req, res) => {
 
     const ratings = await Rating.find({ parking: req.params.parkingId })
       .populate('user', 'firstName lastName avatar')
+      .populate('adminReply.repliedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);

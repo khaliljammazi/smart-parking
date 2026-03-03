@@ -342,18 +342,59 @@ router.get('/vehicles', protect, requireAdmin, async (req, res) => {
 router.put('/vehicles/:id/verify', protect, requireAdmin, async (req, res) => {
   try {
     const { verified } = req.body; // true or false
-    const vehicle = await Vehicle.findById(req.params.id);
+    const vehicle = await Vehicle.findById(req.params.id).populate('owner', 'firstName lastName email');
     if (!vehicle) {
       return res.status(404).json({ success: false, message: 'Vehicle not found' });
     }
 
     vehicle.isVerified = !!verified;
+
+    let cancelledCount = 0;
+
+    if (!verified) {
+      // REJECT: disable vehicle + cancel all pending/confirmed bookings
+      vehicle.isActive = false;
+
+      // Find bookings tied to this vehicle that are pending or confirmed
+      const bookingsToCancel = await Booking.find({
+        vehicle: vehicle._id,
+        status: { $in: ['pending', 'confirmed'] }
+      });
+      cancelledCount = bookingsToCancel.length;
+
+      if (cancelledCount > 0) {
+        const bookingIds = bookingsToCancel.map(b => b._id);
+
+        // Cancel them all at once (bypass validators)
+        await Booking.updateMany(
+          { _id: { $in: bookingIds } },
+          { $set: { status: 'cancelled', cancellationReason: 'vehicle_rejected', cancelledAt: new Date() } }
+        );
+
+        // Release parking spots
+        const parkingUpdates = {};
+        for (const b of bookingsToCancel) {
+          const pid = b.parking.toString();
+          parkingUpdates[pid] = (parkingUpdates[pid] || 0) + 1;
+        }
+        for (const [parkingId, count] of Object.entries(parkingUpdates)) {
+          await Parking.findByIdAndUpdate(parkingId, { $inc: { availableSpots: count } });
+        }
+      }
+    } else {
+      // APPROVE: make sure vehicle is active
+      vehicle.isActive = true;
+    }
+
     await vehicle.save();
 
     res.json({
       success: true,
       data: vehicle,
-      message: verified ? 'Véhicule vérifié' : 'Véhicule rejeté'
+      cancelledBookings: cancelledCount,
+      message: verified
+        ? 'Véhicule vérifié avec succès'
+        : `Véhicule rejeté — ${cancelledCount} réservation(s) annulée(s)`
     });
   } catch (error) {
     console.error('Admin verify vehicle error:', error);
@@ -470,12 +511,108 @@ router.put('/support/tickets/:id/status', protect, requireAdmin, async (req, res
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
-    const ticket = await SupportTicket.findById(req.params.id);
+    const ticket = await SupportTicket.findById(req.params.id).populate('user', 'firstName lastName email');
     if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
 
+    const previousStatus = ticket.status;
     ticket.status = status;
     ticket.handledBy = req.user._id;
     await ticket.save();
+
+    // Send resolution email when ticket is resolved or closed
+    if ((status === 'resolved' || status === 'closed') && previousStatus !== status) {
+      if (ticket.user && ticket.user.email) {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: process.env.EMAIL_HOST || process.env.GMAIL_HOST || 'smtp.gmail.com',
+          port: parseInt(process.env.EMAIL_PORT || '587', 10),
+          secure: false,
+          auth: {
+            user: process.env.EMAIL_USER || process.env.GMAIL_USER,
+            pass: process.env.EMAIL_PASS || process.env.GMAIL_PASS,
+          },
+        });
+        const userName = `${ticket.user.firstName || ''} ${ticket.user.lastName || ''}`.trim();
+        const statusLabel = status === 'resolved' ? 'Résolu' : 'Fermé';
+        const statusColor = status === 'resolved' ? '#2e7d32' : '#616161';
+        const statusIcon = status === 'resolved' ? '✅' : '📋';
+        const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:600px;margin:20px auto;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">${statusIcon}</div>
+      <h1 style="color:#fff;margin:0;font-size:22px;font-weight:600;">Réclamation ${statusLabel}</h1>
+      <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:14px;">Smart Parking — Service Support</p>
+    </div>
+
+    <!-- Body -->
+    <div style="background:#fff;padding:28px 24px;border:1px solid #e3e8ee;border-top:none;">
+      <p style="color:#333;font-size:16px;margin:0 0 20px;">Bonjour <strong>${userName}</strong>,</p>
+      <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Nous vous informons que votre réclamation a été traitée et marquée comme <strong style="color:${statusColor};">${statusLabel}</strong>.
+      </p>
+
+      <!-- Ticket details card -->
+      <div style="background:#f8f9fb;border-radius:12px;padding:20px;margin:0 0 20px;border-left:4px solid #1a237e;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;width:120px;">Catégorie</td>
+            <td style="color:#333;font-size:14px;font-weight:500;padding:4px 0;">${ticket.category}</td>
+          </tr>
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;">Référence</td>
+            <td style="color:#333;font-size:14px;font-weight:500;padding:4px 0;">#${ticket._id.toString().slice(-8).toUpperCase()}</td>
+          </tr>
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;">Statut</td>
+            <td style="padding:4px 0;"><span style="background:${statusColor};color:#fff;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">${statusLabel}</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Description -->
+      <div style="background:#fafafa;border-radius:10px;padding:16px;margin:0 0 16px;">
+        <div style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Votre description</div>
+        <div style="color:#444;font-size:14px;line-height:1.5;">${ticket.description}</div>
+      </div>
+
+      ${ticket.adminResponse ? `
+      <!-- Admin Response -->
+      <div style="background:#e8f5e9;border-radius:10px;padding:16px;margin:0 0 16px;border-left:4px solid #2e7d32;">
+        <div style="color:#2e7d32;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">💬 Réponse de l'équipe</div>
+        <div style="color:#2e7d32;font-size:14px;line-height:1.5;">${ticket.adminResponse}</div>
+      </div>` : ''}
+
+      <div style="background:#e3f2fd;border-radius:10px;padding:16px;margin:20px 0 0;text-align:center;">
+        <p style="margin:0;color:#1565c0;font-size:14px;">Si le problème persiste, n'hésitez pas à ouvrir une nouvelle réclamation depuis l'application.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f8f9fb;border-radius:0 0 16px 16px;padding:20px 24px;text-align:center;border:1px solid #e3e8ee;border-top:none;">
+      <p style="margin:0 0 4px;color:#999;font-size:12px;">© ${new Date().getFullYear()} Smart Parking — Tous droits réservés</p>
+      <p style="margin:0;color:#bbb;font-size:11px;">Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER || process.env.GMAIL_USER,
+            to: ticket.user.email,
+            subject: `${statusIcon} Smart Parking — Votre réclamation est ${statusLabel.toLowerCase()} (#${ticket._id.toString().slice(-8).toUpperCase()})`,
+            html,
+          });
+        } catch (emailErr) {
+          console.error('Resolution email error:', emailErr);
+        }
+      }
+    }
 
     res.json({ success: true, message: 'Ticket updated', data: ticket });
   } catch (err) {
@@ -699,6 +836,400 @@ router.delete('/admins/:id', protect, requireSuperAdmin, async (req, res) => {
     res.json({ success: true, message: 'Admin user deleted successfully' });
   } catch (error) {
     console.error('Delete admin error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  ADMIN REPLY TO SUPPORT TICKET (email to user)
+// ═══════════════════════════════════════════════
+
+const nodemailer = require('nodemailer');
+const adminTransporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || process.env.GMAIL_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT || '587', 10),
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER || process.env.GMAIL_USER,
+    pass: process.env.EMAIL_PASS || process.env.GMAIL_PASS,
+  },
+});
+
+// @route   PUT /api/admin/support/tickets/:id/respond
+// @desc    Admin responds to a support ticket and sends email to user
+// @access  Private (Admin only)
+router.put('/support/tickets/:id/respond', protect, requireAdmin, async (req, res) => {
+  try {
+    const { response, newStatus } = req.body;
+    if (!response || response.trim().length < 3) {
+      return res.status(400).json({ success: false, message: 'La réponse est requise (min 3 caractères)' });
+    }
+
+    const ticket = await SupportTicket.findById(req.params.id).populate('user', 'firstName lastName email');
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket non trouvé' });
+
+    ticket.adminResponse = response;
+    ticket.respondedAt = new Date();
+    ticket.handledBy = req.user._id;
+    ticket.status = newStatus || 'resolved';
+    await ticket.save();
+
+    // Send email to user
+    if (ticket.user && ticket.user.email) {
+      const userName = `${ticket.user.firstName || ''} ${ticket.user.lastName || ''}`.trim();
+      const statusLabel = ticket.status === 'resolved' ? 'Résolu' : ticket.status === 'closed' ? 'Fermé' : ticket.status;
+      const statusColor = ticket.status === 'resolved' ? '#2e7d32' : '#1565c0';
+      const statusIcon = ticket.status === 'resolved' ? '✅' : '💬';
+      const ticketRef = `#${ticket._id.toString().slice(-8).toUpperCase()}`;
+
+      const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:600px;margin:20px auto;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">${statusIcon}</div>
+      <h1 style="color:#fff;margin:0;font-size:22px;font-weight:600;">Réponse à votre réclamation</h1>
+      <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:14px;">Smart Parking — Service Support</p>
+    </div>
+
+    <!-- Body -->
+    <div style="background:#fff;padding:28px 24px;border:1px solid #e3e8ee;border-top:none;">
+      <p style="color:#333;font-size:16px;margin:0 0 20px;">Bonjour <strong>${userName}</strong>,</p>
+      <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Nous avons traité votre réclamation concernant <strong>${ticket.category}</strong> et souhaitons vous communiquer notre réponse.
+      </p>
+
+      <!-- Ticket Info Card -->
+      <div style="background:#f8f9fb;border-radius:12px;padding:20px;margin:0 0 20px;border-left:4px solid #1a237e;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;width:120px;">Référence</td>
+            <td style="color:#333;font-size:14px;font-weight:500;padding:4px 0;">${ticketRef}</td>
+          </tr>
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;">Catégorie</td>
+            <td style="color:#333;font-size:14px;font-weight:500;padding:4px 0;">${ticket.category}</td>
+          </tr>
+          <tr>
+            <td style="color:#888;font-size:13px;padding:4px 0;">Statut</td>
+            <td style="padding:4px 0;"><span style="background:${statusColor};color:#fff;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">${statusLabel}</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- User's original description -->
+      <div style="background:#fafafa;border-radius:10px;padding:16px;margin:0 0 16px;">
+        <div style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📋 Votre description</div>
+        <div style="color:#444;font-size:14px;line-height:1.5;">${ticket.description}</div>
+      </div>
+
+      <!-- Admin Response -->
+      <div style="background:#e8f5e9;border-radius:10px;padding:16px;margin:0 0 16px;border-left:4px solid #2e7d32;">
+        <div style="color:#2e7d32;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">💬 Réponse de l'équipe Smart Parking</div>
+        <div style="color:#2e7d32;font-size:15px;line-height:1.6;font-weight:500;">${response}</div>
+      </div>
+
+      <!-- Call to action -->
+      <div style="background:#e3f2fd;border-radius:10px;padding:16px;margin:20px 0 0;text-align:center;">
+        <p style="margin:0;color:#1565c0;font-size:14px;">Si le problème persiste, n'hésitez pas à ouvrir une nouvelle réclamation depuis l'application.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f8f9fb;border-radius:0 0 16px 16px;padding:20px 24px;text-align:center;border:1px solid #e3e8ee;border-top:none;">
+      <p style="margin:0 0 4px;color:#999;font-size:12px;">© ${new Date().getFullYear()} Smart Parking — Tous droits réservés</p>
+      <p style="margin:0;color:#bbb;font-size:11px;">Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      try {
+        await adminTransporter.sendMail({
+          from: process.env.EMAIL_USER || process.env.GMAIL_USER,
+          to: ticket.user.email,
+          subject: `${statusIcon} Smart Parking — Réponse à votre réclamation ${ticket.category} (${ticketRef})`,
+          html,
+        });
+      } catch (emailErr) {
+        console.error('Reply email error:', emailErr);
+      }
+    }
+
+    res.json({ success: true, message: 'Réponse envoyée avec succès', data: ticket });
+  } catch (error) {
+    console.error('Admin respond ticket error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  ADMIN: VIEW ALL BOOKINGS + DELETE BOOKING
+// ═══════════════════════════════════════════════
+
+// @route   GET /api/admin/bookings
+// @desc    List all bookings (admin view) with filters
+// @access  Private (Admin only)
+router.get('/bookings', protect, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const query = {};
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('user', 'firstName lastName email')
+      .populate('parking', 'name address')
+      .populate('vehicle', 'make model licensePlate')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Booking.countDocuments(query);
+
+    // Summary counts
+    const [pending, confirmed, active, completed, cancelled] = await Promise.all([
+      Booking.countDocuments({ status: 'pending' }),
+      Booking.countDocuments({ status: 'confirmed' }),
+      Booking.countDocuments({ status: 'active' }),
+      Booking.countDocuments({ status: 'completed' }),
+      Booking.countDocuments({ status: 'cancelled' }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        bookings,
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        summary: { pending, confirmed, active, completed, cancelled }
+      }
+    });
+  } catch (error) {
+    console.error('Admin get bookings error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/bookings/:id
+// @desc    Delete a booking (admin)
+// @access  Private (Admin only)
+router.delete('/bookings/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Réservation non trouvée' });
+    }
+
+    // If booking was active/confirmed, release the parking spot
+    if (['confirmed', 'active'].includes(booking.status)) {
+      await Parking.findByIdAndUpdate(booking.parking, {
+        $inc: { availableSpots: 1 }
+      });
+    }
+
+    await Booking.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'Réservation supprimée' });
+  } catch (error) {
+    console.error('Admin delete booking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  REVIEW ANALYTICS DASHBOARD
+// ═══════════════════════════════════════════════
+
+const Rating = require('../models/Rating');
+
+// @route   GET /api/admin/reviews/analytics
+// @desc    Review analytics: sentiment trends, top-rated parkings, complaint patterns
+// @access  Private (Admin only)
+router.get('/reviews/analytics', protect, requireAdmin, async (req, res) => {
+  try {
+    // Overall stats
+    const [totalReviews, avgRating] = await Promise.all([
+      Rating.countDocuments(),
+      Rating.aggregate([{ $group: { _id: null, avg: { $avg: '$rating' } } }]),
+    ]);
+
+    // Rating distribution (1-5 stars)
+    const ratingDistribution = await Rating.aggregate([
+      { $group: { _id: '$rating', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Top 10 highest-rated parkings (min 3 reviews)
+    const topRatedParkings = await Rating.aggregate([
+      { $group: { _id: '$parking', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+      { $match: { count: { $gte: 3 } } },
+      { $sort: { avg: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: 'parkings', localField: '_id', foreignField: '_id', as: 'parking' } },
+      { $unwind: '$parking' },
+      { $project: { name: '$parking.name', address: '$parking.address', avg: 1, count: 1 } }
+    ]);
+
+    // Worst 10 parkings (min 2 reviews)
+    const worstParkings = await Rating.aggregate([
+      { $group: { _id: '$parking', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+      { $match: { count: { $gte: 2 } } },
+      { $sort: { avg: 1 } },
+      { $limit: 10 },
+      { $lookup: { from: 'parkings', localField: '_id', foreignField: '_id', as: 'parking' } },
+      { $unwind: '$parking' },
+      { $project: { name: '$parking.name', address: '$parking.address', avg: 1, count: 1 } }
+    ]);
+
+    // Monthly trend (last 12 months)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const monthlyTrend = await Rating.aggregate([
+      { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+      { $group: {
+        _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+        avgRating: { $avg: '$rating' },
+        count: { $sum: 1 },
+        lowCount: { $sum: { $cond: [{ $lte: ['$rating', 2] }, 1, 0] } },
+        highCount: { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } }
+      }},
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    // Most used tags (complaint patterns)
+    const tagStats = await Rating.aggregate([
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags', count: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
+      { $sort: { count: -1 } },
+      { $limit: 20 }
+    ]);
+
+    // Recent negative reviews (rating <= 2)
+    const recentComplaints = await Rating.find({ rating: { $lte: 2 } })
+      .populate('user', 'firstName lastName')
+      .populate('parking', 'name address')
+      .sort({ createdAt: -1 })
+      .limit(15)
+      .select('rating review tags createdAt');
+
+    // Reviews awaiting admin reply
+    const unrepliedCount = await Rating.countDocuments({
+      review: { $exists: true, $ne: '' },
+      'adminReply.text': { $exists: false }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalReviews,
+          averageRating: avgRating[0]?.avg ? Math.round(avgRating[0].avg * 100) / 100 : 0,
+          unrepliedCount
+        },
+        ratingDistribution,
+        topRatedParkings,
+        worstParkings,
+        monthlyTrend,
+        tagStats,
+        recentComplaints
+      }
+    });
+  } catch (error) {
+    console.error('Review analytics error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/reviews
+// @desc    Get all reviews (admin view) with pagination
+// @access  Private (Admin only)
+router.get('/reviews', protect, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, minRating, maxRating, hasReply } = req.query;
+    const query = {};
+
+    if (minRating) query.rating = { ...query.rating, $gte: parseInt(minRating) };
+    if (maxRating) query.rating = { ...query.rating, $lte: parseInt(maxRating) };
+    if (hasReply === 'true') query['adminReply.text'] = { $exists: true };
+    if (hasReply === 'false') query['adminReply.text'] = { $exists: false };
+
+    const reviews = await Rating.find(query)
+      .populate('user', 'firstName lastName email')
+      .populate('parking', 'name address')
+      .populate('adminReply.repliedBy', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Rating.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: { reviews, total, page: parseInt(page), limit: parseInt(limit) }
+    });
+  } catch (error) {
+    console.error('Admin get reviews error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/reviews/:id/reply
+// @desc    Admin/owner public reply to a review
+// @access  Private (Admin only)
+router.put('/reviews/:id/reply', protect, requireAdmin, async (req, res) => {
+  try {
+    const { reply } = req.body;
+    if (!reply || reply.trim().length < 2) {
+      return res.status(400).json({ success: false, message: 'La réponse est requise' });
+    }
+
+    const rating = await Rating.findById(req.params.id);
+    if (!rating) return res.status(404).json({ success: false, message: 'Avis non trouvé' });
+
+    rating.adminReply = {
+      text: reply,
+      repliedBy: req.user._id,
+      repliedAt: new Date()
+    };
+    await rating.save();
+
+    const updated = await Rating.findById(req.params.id)
+      .populate('adminReply.repliedBy', 'firstName lastName');
+
+    res.json({ success: true, message: 'Réponse publiée', data: updated });
+  } catch (error) {
+    console.error('Admin reply to review error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/reviews/:id
+// @desc    Delete a review (moderation)
+// @access  Private (Admin only)
+router.delete('/reviews/:id', protect, requireAdmin, async (req, res) => {
+  try {
+    const rating = await Rating.findById(req.params.id);
+    if (!rating) return res.status(404).json({ success: false, message: 'Avis non trouvé' });
+
+    const parkingId = rating.parking;
+    await Rating.findByIdAndDelete(req.params.id);
+
+    // Recalculate parking average
+    await Rating.updateParkingRating(parkingId);
+
+    res.json({ success: true, message: 'Avis supprimé' });
+  } catch (error) {
+    console.error('Admin delete review error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

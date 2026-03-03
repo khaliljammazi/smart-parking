@@ -29,7 +29,14 @@ const ratingSchema = new mongoose.Schema({
   tags: [{
     type: String,
     trim: true
-  }]
+  }],
+
+  // Owner/Admin public reply
+  adminReply: {
+    text: { type: String, trim: true, maxlength: 500 },
+    repliedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    repliedAt: { type: Date }
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

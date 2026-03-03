@@ -44,6 +44,7 @@ class ParkingModel {
   final double rating;
   final String? imageUrl;
   final bool isOpen;
+  double distance; // distance in km from user (computed client-side)
 
   ParkingModel({
     required this.id,
@@ -57,6 +58,7 @@ class ParkingModel {
     required this.rating,
     this.imageUrl,
     required this.isOpen,
+    this.distance = 0.0,
   });
 
   factory ParkingModel.fromJson(Map<String, dynamic> json) {
@@ -64,12 +66,12 @@ class ParkingModel {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       address: json['address'] ?? '',
-      latitude: json['latitude'] ?? 0.0,
-      longitude: json['longitude'] ?? 0.0,
-      pricePerHour: json['pricePerHour'] ?? 0.0,
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      pricePerHour: (json['pricePerHour'] ?? 0.0).toDouble(),
       totalSpots: json['totalSpots'] ?? 0,
       availableSpots: json['availableSpots'] ?? 0,
-      rating: json['rating'] ?? 0.0,
+      rating: (json['rating'] ?? 0.0).toDouble(),
       imageUrl: json['imageUrl'],
       isOpen: json['isOpen'] ?? true,
     );

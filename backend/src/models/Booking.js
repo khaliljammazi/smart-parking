@@ -33,8 +33,8 @@ const bookingSchema = new mongoose.Schema({
     validate: {
       validator: function(value) {
         // Skip validation if booking is being checked in (has checkInTime), checked out (has checkOutTime),
-        // or is already active/completed
-        if (this.checkInTime || this.checkOutTime || this.status === 'active' || this.status === 'completed') {
+        // or is already active/completed/cancelled
+        if (this.checkInTime || this.checkOutTime || ['active', 'completed', 'cancelled', 'no_show'].includes(this.status)) {
           return true;
         }
         return value > new Date();

@@ -447,14 +447,7 @@ class _MapPageState extends State<MapPage> {
                 }
               },
             ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Fonction de recherche à venir')),
-              );
-            },
-          ),
+         
         ],
       ),
       body: Stack(

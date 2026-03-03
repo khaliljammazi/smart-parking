@@ -344,4 +344,200 @@ class AdminService {
       return false;
     }
   }
+
+  // Reply to support ticket (sends email to user)
+  static Future<bool> replyToSupportTicket(String ticketId, String response, {String? newStatus}) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final res = await http.put(
+        Uri.parse('$baseUrl/admin/support/tickets/$ticketId/respond'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'response': response,
+          if (newStatus != null) 'newStatus': newStatus,
+        }),
+      );
+
+      return res.statusCode == 200;
+    } catch (e) {
+      print('Reply to support ticket error: $e');
+      return false;
+    }
+  }
+
+  // Get all bookings (admin)
+  static Future<Map<String, dynamic>?> getAllBookings({
+    int page = 1,
+    int limit = 20,
+    String? status,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (status != null && status != 'all') 'status': status,
+      };
+
+      final uri = Uri.parse('$baseUrl/admin/bookings').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Get all bookings error: $e');
+      return null;
+    }
+  }
+
+  // Delete booking (admin)
+  static Future<bool> deleteBooking(String bookingId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/bookings/$bookingId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Delete booking error: $e');
+      return false;
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  //  REVIEW ANALYTICS & MANAGEMENT
+  // ═══════════════════════════════════════════
+
+  // Get review analytics dashboard data
+  static Future<Map<String, dynamic>?> getReviewAnalytics() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/admin/reviews/analytics'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Get review analytics error: $e');
+      return null;
+    }
+  }
+
+  // Get all reviews (admin)
+  static Future<Map<String, dynamic>?> getAllReviews({
+    int page = 1,
+    int limit = 20,
+    int? minRating,
+    int? maxRating,
+    bool? hasReply,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (minRating != null) 'minRating': minRating.toString(),
+        if (maxRating != null) 'maxRating': maxRating.toString(),
+        if (hasReply != null) 'hasReply': hasReply.toString(),
+      };
+
+      final uri = Uri.parse('$baseUrl/admin/reviews').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Get all reviews error: $e');
+      return null;
+    }
+  }
+
+  // Reply to a review (admin/owner)
+  static Future<bool> replyToReview(String reviewId, String reply) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/admin/reviews/$reviewId/reply'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'reply': reply}),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Reply to review error: $e');
+      return false;
+    }
+  }
+
+  // Delete a review (moderation)
+  static Future<bool> deleteReview(String reviewId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/admin/reviews/$reviewId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Delete review error: $e');
+      return false;
+    }
+  }
 }

@@ -102,15 +102,19 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart_par
         startTime: { $lt: thirtyMinAgo }
       });
 
-      for (const booking of expired) {
-        booking.status = 'cancelled';
-        booking.cancelledAt = new Date();
-        booking.cancellationReason = 'expired';
-        await booking.save();
-
-        await Parking.findByIdAndUpdate(booking.parking, {
-          $inc: { availableSpots: 1 }
-        });
+      // Use updateMany to bypass Mongoose validators (startTime is in the past)
+      const expiredIds = expired.map(b => b._id);
+      if (expiredIds.length > 0) {
+        await Booking.updateMany(
+          { _id: { $in: expiredIds } },
+          { $set: { status: 'cancelled', cancelledAt: new Date(), cancellationReason: 'expired' } }
+        );
+        // Release parking spots
+        const parkingIds = [...new Set(expired.map(b => b.parking?.toString()).filter(Boolean))];
+        for (const pid of parkingIds) {
+          const count = expired.filter(b => b.parking?.toString() === pid).length;
+          await Parking.findByIdAndUpdate(pid, { $inc: { availableSpots: count } });
+        }
       }
 
       if (expired.length > 0) {
