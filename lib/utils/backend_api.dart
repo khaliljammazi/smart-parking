@@ -2,6 +2,7 @@ import '../model/parking_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../authentication/auth_service.dart';
 
 class BackendApi {
   static String get baseUrl {
@@ -160,6 +161,76 @@ class BackendApi {
       return response.statusCode == 200;
     } catch (e) {
       print('Error deleting parking: $e');
+      return false;
+    }
+  }
+
+  static Future<List<String>> getFavorites() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/favorites'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final favorites = data['data']?['favorites'] as List?;
+        if (favorites != null) {
+          return favorites.map((f) {
+            if (f is Map) return f['_id']?.toString() ?? f['id']?.toString() ?? '';
+            return f.toString();
+          }).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching favorites: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> addFavorite(String parkingId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/favorites/$parkingId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error adding favorite: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> removeFavorite(String parkingId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return false;
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/users/favorites/$parkingId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error removing favorite: $e');
       return false;
     }
   }

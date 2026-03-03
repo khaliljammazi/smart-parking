@@ -46,8 +46,17 @@ void main() async {
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AuthProvider()),
         ChangeNotifierProvider(create: (context) => LanguageProvider()),
-        ChangeNotifierProvider(create: (context) => FavoritesProvider()),
-        ChangeNotifierProvider(create: (context) => VehicleProvider()),
+ ChangeNotifierProxyProvider<AuthProvider, FavoritesProvider>(
+          create: (context) => FavoritesProvider(),
+          update: (context, auth, favorites) {
+            if (auth.isAuthenticated) {
+              favorites?.syncWithBackend();
+            } else {
+              favorites?.clearFavorites();
+            }
+            return favorites!;
+          },
+        ),        ChangeNotifierProvider(create: (context) => VehicleProvider()),
       ],
       child: const MyApp(),
     ),

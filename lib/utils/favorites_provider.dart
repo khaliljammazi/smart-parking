@@ -46,13 +46,17 @@ class FavoritesProvider with ChangeNotifier {
   // Sync favorites with backend
   Future<void> syncWithBackend() async {
     if (_isSynced) return;
-    
+    if (_isLoading) return;
+
     try {
       final token = await AuthService.getToken();
       if (token == null) {
         // User not logged in, use local storage only
         return;
       }
+
+      _isLoading = true;
+      notifyListeners();
 
       final response = await http.get(
         Uri.parse('${AuthService.baseUrl}/users/favorites'),
@@ -61,6 +65,7 @@ class FavoritesProvider with ChangeNotifier {
           'Content-Type': 'application/json',
         },
       ).timeout(const Duration(seconds: 5));
+      _isLoading = false;
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -73,9 +78,16 @@ class FavoritesProvider with ChangeNotifier {
           await _saveLocalFavorites();
           _isSynced = true;
           notifyListeners();
+             } else {
+          notifyListeners();
         }
       }
+      else{
+        notifyListeners();
+      }
     } catch (e) {
+        _isLoading = false;
+      notifyListeners();
       if (kDebugMode) {
         print('Sync favorites error: $e');
       }
@@ -189,6 +201,7 @@ class FavoritesProvider with ChangeNotifier {
 
   // Clear favorites (e.g., on logout)
   Future<void> clearFavorites() async {
+    if (_favoriteIds.isEmpty && !_isSynced) return;
     _favoriteIds.clear();
     _isSynced = false;
     await _saveLocalFavorites();
