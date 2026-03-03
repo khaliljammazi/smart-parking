@@ -3,7 +3,7 @@
 ## Overview
 The Smart Parking app now supports **multiple vehicles per user**. Users can add unlimited cars and motorcycles to their account and select which specific vehicle to use for each parking reservation.
 
-## Key Features
+## Key Features 
 
 ### 1. Multiple Vehicle Support
 - Users can add multiple vehicles (cars, motorcycles)
