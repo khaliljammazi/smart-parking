@@ -557,11 +557,32 @@ class _HomePageState extends State<HomePage> {
                           } else {
                             return Consumer<FavoritesProvider>(
                               builder: (context, favoritesProvider, child) {
+                                // Filter only favorite parkings
+                                final favoriteParkings = snapshot.data!
+                                    .where((p) => favoritesProvider.isFavorite(p.id))
+                                    .toList();
+
+                                if (favoriteParkings.isEmpty) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.0),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.favorite_border, color: Colors.grey, size: 40),
+                                          SizedBox(height: 8),
+                                          Text('Vous n\'avez pas encore de favoris', 
+                                            style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+
                                 return ListView.builder(
                                   scrollDirection: Axis.horizontal,
                                   itemBuilder: (context, index) {
-                                    final parking = snapshot.data![index];
-                                    final isFavorite = favoritesProvider.isFavorite(parking.id);
+                                    final parking = favoriteParkings[index];
                                     return ParkingCardHome(
                                       title: parking.name,
                                       imagePath: parking.imageUrl ?? 'https://via.placeholder.com/300x200',
@@ -569,11 +590,11 @@ class _HomePageState extends State<HomePage> {
                                       motoPrice: parking.pricePerHour * 0.6,
                                       carPrice: parking.pricePerHour,
                                       address: parking.address,
-                                      isFavorite: isFavorite,
-                                      parkingId: parking.id, // Changed from id to parkingId
+                                      isFavorite: true,
+                                      parkingId: parking.id,
                                     );
                                   },
-                                  itemCount: snapshot.data!.length > 4 ? 4 : snapshot.data!.length,
+                                  itemCount: favoriteParkings.length > 4 ? 4 : favoriteParkings.length,
                                 );
                               },
                             );

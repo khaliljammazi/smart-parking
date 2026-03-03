@@ -11,6 +11,7 @@ import '../admin/admin_service.dart';
 import '../admin/parking_form_page.dart';
 import '../location/map_page.dart';
 import 'parking_detail_page.dart';
+import '../utils/favorites_provider.dart';
 
 class ParkingListPage extends StatefulWidget {
   const ParkingListPage({super.key});
@@ -420,51 +421,83 @@ class _ParkingListPageState extends State<ParkingListPage> {
                 ),
               ),
               // Admin actions or Rating
-              if (isAdmin)
-                PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'edit') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ParkingFormPage(parking: spot),
-                        ),
-                      );
-                      if (result == true) _loadParkings();
-                    } else if (value == 'delete') {
-                      _confirmDeleteParking(spot);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.blue), title: Text('Modifier'))),
-                    const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Supprimer'))),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            spot.rating.toString(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.amber,
+              // Admin actions or Rating & Favorites
+              isAdmin
+                  ? PopupMenuButton<String>(
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ParkingFormPage(parking: spot),
                             ),
+                          );
+                          if (result == true) _loadParkings();
+                        } else if (value == 'delete') {
+                          _confirmDeleteParking(spot);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit, color: Colors.blue),
+                            title: Text('Modifier'),
                           ),
-                        ],
-                      ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, color: Colors.red),
+                            title: Text('Supprimer'),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Consumer<FavoritesProvider>(
+                      builder: (context, favoritesProvider, child) {
+                        final isFavorite = favoritesProvider.isFavorite(spot.id);
+                        return Column(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                isFavorite ? Icons.favorite : Icons.favorite_border,
+                                color: isFavorite ? Colors.red : Colors.grey,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => favoritesProvider.toggleFavorite(spot.id),
+                              tooltip: isFavorite
+                                  ? 'Retirer des favoris'
+                                  : 'Ajouter aux favoris',
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    spot.rating.toString(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  ],
-                ),
             ],
           ),
         ),
