@@ -76,6 +76,23 @@ const parkingSchema = new mongoose.Schema({
     }
   },
 
+  // Smart Pricing
+  smartPricing: {
+    enabled: { type: Boolean, default: false },
+    // Peak hours surcharge multiplier (e.g. 1.5 = 50% more)
+    peakMultiplier: { type: Number, default: 1.5, min: 1 },
+    peakHours: {
+      start: { type: Number, default: 8 },  // 8:00 AM
+      end: { type: Number, default: 18 }     // 6:00 PM
+    },
+    peakDays: [{ type: Number, min: 0, max: 6 }], // 0=Sun..6=Sat
+    // Long stay discount (% off after threshold hours)
+    longStayDiscount: { type: Number, default: 10, min: 0, max: 50 }, // 10% off
+    longStayThreshold: { type: Number, default: 6, min: 1 },          // after 6h
+    // Off-peak discount
+    offPeakDiscount: { type: Number, default: 20, min: 0, max: 50 },  // 20% off
+  },
+
   // Slot Types (breakdown of totalSpots by vehicle size)
   slotTypes: [{
     type: {

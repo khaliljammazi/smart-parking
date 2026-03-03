@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:async';
 import '../booking/booking_service.dart';
 import '../utils/constanst.dart';
 import 'qr_code_dialog.dart';
 import 'rating_dialog.dart';
+import 'booking_actions_dialog.dart';
 import 'package:intl/intl.dart';
 
 class BookingHistoryPage extends StatefulWidget {
@@ -16,11 +18,22 @@ class BookingHistoryPage extends StatefulWidget {
 class _BookingHistoryPageState extends State<BookingHistoryPage> {
   bool _isLoading = true;
   List<dynamic> _bookings = [];
+  Timer? _countdownTimer;
 
   @override
   void initState() {
     super.initState();
     _loadBookings();
+    // Refresh countdown every second
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadBookings() async {
@@ -218,8 +231,13 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     final startTime = booking['startTime'] != null
         ? DateTime.parse(booking['startTime'])
         : null;
+    final endTime = booking['endTime'] != null
+        ? DateTime.parse(booking['endTime'])
+        : null;
     final qrCode = booking['qrCode'];
     final adminValidated = booking['adminValidated'] ?? false;
+    final isRecurring = booking['recurring']?['enabled'] == true;
+    final cancellationReason = booking['cancellationReason'];
 
     // Construct address string from address object
     final address = parking['address'];
@@ -236,18 +254,43 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with status
+            // Header with status + recurring badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    parking['name'] ?? 'Parking',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColor.navy,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          parking['name'] ?? 'Parking',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColor.navy,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isRecurring) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.deepPurple.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.repeat, size: 12, color: Colors.deepPurple),
+                              SizedBox(width: 2),
+                              Text('Récurrent', style: TextStyle(fontSize: 10, color: Colors.deepPurple, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Container(
@@ -267,6 +310,29 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                 ),
               ],
             ),
+
+            // Expired badge
+            if (status == 'cancelled' && cancellationReason == 'expired')
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timer_off, size: 14, color: Colors.red),
+                      SizedBox(width: 4),
+                      Text('Expiré — non présenté',
+                          style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+
             const SizedBox(height: 12),
 
             // Address
@@ -296,6 +362,17 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                   ),
                 ],
               ),
+
+            // ── Countdown timer ──
+            if ((status == 'confirmed' || status == 'active') && startTime != null && endTime != null)
+              _buildCountdownWidget(status, startTime, endTime),
+
+            // ── Smart pricing details ──
+            if (booking['pricingDetails'] != null &&
+                booking['pricingDetails']['discountType'] != null &&
+                booking['pricingDetails']['discountType'] != 'none')
+              _buildPricingBadge(booking['pricingDetails']),
+
             const SizedBox(height: 16),
 
             // Actions
@@ -336,7 +413,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                       ),
                     ),
                   const SizedBox(height: 8),
-                  // Action buttons
+                  // Action buttons row
                   Row(
                     children: [
                       if (qrCode != null && status == 'confirmed')
@@ -385,6 +462,35 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         ),
                     ],
                   ),
+                  // Extend + Actions row for active bookings
+                  if (status == 'active')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => BookingActionsDialog(
+                                bookingId: booking['_id'],
+                                status: status,
+                                onUpdate: _loadBookings,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.more_horiz),
+                          label: const Text('Prolonger / Annuler'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColor.navy,
+                            side: const BorderSide(color: AppColor.navy),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
 
@@ -430,6 +536,157 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Countdown widget for confirmed (time until check-in deadline) and active (time remaining)
+  Widget _buildCountdownWidget(String status, DateTime startTime, DateTime endTime) {
+    final now = DateTime.now();
+
+    if (status == 'confirmed') {
+      // Countdown to check-in deadline (startTime + 30 min)
+      final deadline = startTime.add(const Duration(minutes: 30));
+      final remaining = deadline.difference(now);
+
+      if (remaining.isNegative) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.warning, size: 16, color: Colors.red),
+                SizedBox(width: 4),
+                Text('Délai de check-in dépassé !',
+                    style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (now.isBefore(startTime)) {
+        // Before start — count down to start
+        final toStart = startTime.difference(now);
+        return _buildTimerWidget(
+          icon: Icons.hourglass_top,
+          label: 'Commence dans',
+          duration: toStart,
+          color: Colors.blue,
+        );
+      }
+
+      // Between start and deadline — urgent check-in countdown
+      return _buildTimerWidget(
+        icon: Icons.running_with_errors,
+        label: 'Check-in avant',
+        duration: remaining,
+        color: remaining.inMinutes < 10 ? Colors.red : Colors.orange,
+      );
+    }
+
+    // Active — time remaining
+    final remaining = endTime.difference(now);
+    if (remaining.isNegative) {
+      return _buildTimerWidget(
+        icon: Icons.timer_off,
+        label: 'Dépassé de',
+        duration: remaining.abs(),
+        color: Colors.red,
+      );
+    }
+    return _buildTimerWidget(
+      icon: Icons.timer,
+      label: 'Temps restant',
+      duration: remaining,
+      color: remaining.inMinutes < 30 ? Colors.orange : Colors.green,
+    );
+  }
+
+  Widget _buildTimerWidget({
+    required IconData icon,
+    required String label,
+    required Duration duration,
+    required Color color,
+  }) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    final timeStr = hours > 0
+        ? '${hours}h ${minutes.toString().padLeft(2, '0')}m ${seconds.toString().padLeft(2, '0')}s'
+        : '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text('$label: ', style: TextStyle(fontSize: 12, color: color)),
+            Text(timeStr,
+                style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPricingBadge(Map<String, dynamic> details) {
+    final discountType = details['discountType'] ?? 'none';
+    final discount = (details['discount'] ?? 0).toDouble();
+    final isPeak = details['isPeak'] == true;
+
+    String label;
+    IconData icon;
+    Color color;
+
+    if (isPeak) {
+      label = 'Tarif heures de pointe (x${details['peakMultiplier']})';
+      icon = Icons.trending_up;
+      color = Colors.red;
+    } else if (discountType == 'off_peak') {
+      label = 'Réduction hors pointe -${discount.toStringAsFixed(0)}%';
+      icon = Icons.trending_down;
+      color = Colors.green;
+    } else if (discountType == 'long_stay') {
+      label = 'Réduction longue durée -${discount.toStringAsFixed(0)}%';
+      icon = Icons.access_time_filled;
+      color = Colors.teal;
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
           ],
         ),
       ),

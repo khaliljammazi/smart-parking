@@ -182,34 +182,75 @@ router.post('/scan', async (req, res) => {
     }
 
     // Check if booking is already validated
-    if (booking.adminValidated) {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking already validated'
+    if (booking.adminValidated && booking.status === 'active') {
+      // Second scan → check-out
+      booking.status = 'completed';
+      booking.checkOutTime = new Date();
+      await booking.save();
+
+      // Release parking spot
+      if (booking.parking && booking.parking._id) {
+        const Parking = require('../models/Parking');
+        await Parking.findByIdAndUpdate(booking.parking._id, { $inc: { availableSpots: 1 } });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Check-out effectué avec succès',
+        data: {
+          action: 'checkout',
+          booking: {
+            id: booking._id,
+            status: booking.status,
+            checkOutTime: booking.checkOutTime,
+            user: {
+              name: `${booking.user.firstName} ${booking.user.lastName}`,
+              email: booking.user.email
+            },
+            vehicle: booking.vehicle ? {
+              make: booking.vehicle.make,
+              model: booking.vehicle.model,
+              licensePlate: booking.vehicle.licensePlate
+            } : null,
+            parking: {
+              name: booking.parking.name,
+              address: booking.parking.address
+            }
+          }
+        }
       });
     }
 
-    // Check if booking can be validated
+    // Check if booking can be validated (first scan → check-in)
     if (booking.status !== 'confirmed') {
       return res.status(400).json({
         success: false,
-        message: 'Booking is not in valid state for validation'
+        message: `La réservation n'est pas dans un état valide (statut: ${booking.status})`
       });
     }
 
-    // Validate the booking
+    // First scan → Check-in: validate and set status to active
     booking.adminValidated = true;
     booking.adminValidatedAt = new Date();
-    // Note: adminValidatedBy would be set if we had admin authentication
+    booking.status = 'active';
+    booking.checkInTime = new Date();
     await booking.save();
+
+    // Decrement available spots
+    if (booking.parking && booking.parking._id) {
+      const Parking = require('../models/Parking');
+      await Parking.findByIdAndUpdate(booking.parking._id, { $inc: { availableSpots: -1 } });
+    }
 
     res.json({
       success: true,
-      message: 'Booking validated successfully',
+      message: 'Check-in effectué — réservation activée',
       data: {
+        action: 'checkin',
         booking: {
           id: booking._id,
           status: booking.status,
+          checkInTime: booking.checkInTime,
           adminValidated: booking.adminValidated,
           adminValidatedAt: booking.adminValidatedAt,
           user: {

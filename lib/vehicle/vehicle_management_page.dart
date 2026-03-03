@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../vehicle/vehicle_service.dart';
 import '../utils/constanst.dart';
+import '../parkinglist/parking_list_page.dart';
 import 'vehicle_form_page.dart';
 import 'vehicle_history_page.dart';
 import 'vehicle_stats_page.dart';
@@ -126,16 +126,37 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
     );
     if (images.isEmpty) return;
 
-    final files = images.take(3).map((x) => File(x.path)).toList();
-    final result = await VehicleService.uploadPhotos(vehicleId, files);
-    if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Photos ajoutées'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _loadVehicles();
+    setState(() => _isLoading = true);
+    try {
+      final xFiles = images.take(3).toList();
+      final result = await VehicleService.uploadPhotos(vehicleId, xFiles);
+      if (result != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photos ajoutées avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadVehicles();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de l\'upload des photos'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -165,105 +186,9 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
     ).push(MaterialPageRoute(builder: (_) => const VehicleStatsPage()));
   }
 
-  void _showSlotRecommendation(Map<String, dynamic> vehicle) {
-    final type = vehicle['type'] ?? 'car';
-    final recommended = VehicleService.getRecommendedSlots(type);
-    final typeLabels = {
-      'car': 'Voiture',
-      'motorcycle': 'Moto',
-      'truck': 'Camion',
-      'van': 'Fourgon',
-      'electric': 'Électrique',
-      'hybrid': 'Hybride',
-    };
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.local_parking, color: AppColor.navy, size: 28),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Places recommandées pour ${vehicle['make']} ${vehicle['model']}',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: AppColor.navy,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Type: ${typeLabels[type] ?? type} • ${vehicle['licensePlate']}',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const Divider(height: 24),
-            const Text(
-              'Types de places compatibles :',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: recommended.map((slot) {
-                final isPrimary = slot == recommended.first;
-                return Chip(
-                  avatar: Icon(
-                    isPrimary ? Icons.check_circle : Icons.check,
-                    color: isPrimary ? Colors.green : Colors.grey[600],
-                    size: 18,
-                  ),
-                  label: Text(VehicleService.slotTypeLabel(slot)),
-                  backgroundColor: isPrimary
-                      ? Colors.green[50]
-                      : Colors.grey[100],
-                  side: isPrimary
-                      ? const BorderSide(color: Colors.green)
-                      : BorderSide.none,
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      recommended.first == 'motorcycle'
-                          ? 'Votre moto peut utiliser les places moto ou plus grandes.'
-                          : recommended.first == 'large'
-                          ? 'Votre véhicule nécessite une grande place de parking.'
-                          : 'Nous recommandons une place "${VehicleService.slotTypeLabel(recommended.first)}" pour votre véhicule.',
-                      style: const TextStyle(fontSize: 13, color: Colors.blue),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
+  void _navigateToParking(Map<String, dynamic> vehicle) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ParkingListPage()),
     );
   }
 
@@ -495,7 +420,7 @@ class _VehicleManagementPageState extends State<VehicleManagementPage> {
                             _openHistory(vehicle);
                             break;
                           case 'slots':
-                            _showSlotRecommendation(vehicle);
+                            _navigateToParking(vehicle);
                             break;
                         }
                       },

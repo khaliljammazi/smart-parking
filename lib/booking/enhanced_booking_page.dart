@@ -7,6 +7,8 @@ import '../utils/text/medium.dart';
 import '../vehicle/vehicle_provider.dart';
 import '../vehicle/vehicle_form_page.dart';
 import 'vehicle_selector_widget.dart';
+import 'booking_service.dart';
+import 'package:intl/intl.dart';
 
 /// Enhanced booking confirmation page with multiple vehicle selection
 class EnhancedBookingConfirmationPage extends StatefulWidget {
@@ -46,13 +48,38 @@ class _EnhancedBookingConfirmationPageState
   String? _guestName;
   String? _guestPhone;
 
+  // Smart pricing
+  Map<String, dynamic>? _smartPrice;
+  bool _loadingPrice = false;
+
+  // Recurring booking
+  bool _isRecurring = false;
+  String _recurringPattern = 'weekdays';
+  List<int> _selectedDays = [];
+  DateTime? _recurringUntil;
+
   @override
   void initState() {
     super.initState();
-    // Load vehicles when page opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<VehicleProvider>().loadVehicles();
+      _fetchSmartPrice();
     });
+  }
+
+  Future<void> _fetchSmartPrice() async {
+    setState(() => _loadingPrice = true);
+    final result = await BookingService.calculateSmartPrice(
+      parkingId: widget.parkingId.toString(),
+      startTime: widget.startTime.toIso8601String(),
+      endTime: widget.endTime.toIso8601String(),
+    );
+    if (mounted) {
+      setState(() {
+        _smartPrice = result;
+        _loadingPrice = false;
+      });
+    }
   }
 
   void _showGuestBookingDialog() {
@@ -158,9 +185,13 @@ class _EnhancedBookingConfirmationPageState
             const SizedBox(height: 12),
             _buildTimeInfoCard(),
             const SizedBox(height: 12),
+            _buildSmartPricingCard(),
+            const SizedBox(height: 12),
             _buildBookerInfoCard(),
             const SizedBox(height: 12),
             _buildVehicleSelectionCard(),
+            const SizedBox(height: 12),
+            _buildRecurringCard(),
             const SizedBox(height: 12),
             _buildPaymentMethodCard(),
             const SizedBox(height: 12),
@@ -404,6 +435,7 @@ class _EnhancedBookingConfirmationPageState
   }
 
   Widget _buildPriceSummaryCard() {
+    final total = _smartPrice != null ? _smartPrice!['total'] : widget.estimatedPrice;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -420,13 +452,216 @@ class _EnhancedBookingConfirmationPageState
                 fontSize: 16,
                 color: AppColor.forText,
               ),
-              SemiBoldText(
-                text: '${widget.estimatedPrice.toStringAsFixed(0)} DT',
-                fontSize: 20,
-                color: AppColor.orange,
+              _loadingPrice
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : SemiBoldText(
+                      text: '${(total is num ? total : widget.estimatedPrice).toStringAsFixed(2)} DT',
+                      fontSize: 20,
+                      color: AppColor.orange,
+                    ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Smart pricing info card
+  Widget _buildSmartPricingCard() {
+    if (_loadingPrice) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_smartPrice == null || _smartPrice!['smartPricingEnabled'] != true) {
+      return const SizedBox.shrink();
+    }
+
+    final isPeak = _smartPrice!['isPeak'] == true;
+    final discountType = _smartPrice!['discountType'] ?? 'none';
+    final discount = (_smartPrice!['discount'] ?? 0).toDouble();
+    final baseRate = (_smartPrice!['baseRate'] ?? 0).toDouble();
+    final appliedRate = (_smartPrice!['appliedRate'] ?? 0).toDouble();
+
+    Color tagColor;
+    IconData tagIcon;
+    String tagLabel;
+
+    if (isPeak) {
+      tagColor = Colors.red;
+      tagIcon = Icons.trending_up;
+      tagLabel = 'Heures de pointe (x${_smartPrice!['peakMultiplier']})';
+    } else if (discountType == 'off_peak') {
+      tagColor = Colors.green;
+      tagIcon = Icons.trending_down;
+      tagLabel = 'Hors pointe — ${discount.toStringAsFixed(0)}% de réduction';
+    } else if (discountType == 'long_stay') {
+      tagColor = Colors.teal;
+      tagIcon = Icons.access_time_filled;
+      tagLabel = 'Longue durée — ${discount.toStringAsFixed(0)}% de réduction';
+    } else {
+      tagColor = Colors.grey;
+      tagIcon = Icons.info_outline;
+      tagLabel = 'Tarif standard';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tagColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.price_change, size: 20, color: tagColor),
+              const SizedBox(width: 8),
+              const SemiBoldText(text: 'Smart Pricing', fontSize: 16, color: AppColor.forText),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: tagColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(tagIcon, size: 16, color: tagColor),
+                const SizedBox(width: 6),
+                Text(tagLabel, style: TextStyle(color: tagColor, fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const MediumText(text: 'Tarif de base', fontSize: 13, color: AppColor.fadeText),
+              Text('${baseRate.toStringAsFixed(2)} DT/h',
+                  style: TextStyle(fontSize: 13, color: AppColor.fadeText,
+                      decoration: isPeak || discountType != 'none' ? TextDecoration.lineThrough : null)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const MediumText(text: 'Tarif appliqué', fontSize: 14, color: AppColor.forText),
+              SemiBoldText(text: '${appliedRate.toStringAsFixed(2)} DT/h', fontSize: 14, color: tagColor),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Recurring booking card
+  Widget _buildRecurringCard() {
+    final dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SemiBoldText(text: 'Réservation récurrente', fontSize: 16, color: AppColor.forText),
+              Switch(
+                value: _isRecurring,
+                activeColor: AppColor.navy,
+                onChanged: (v) => setState(() => _isRecurring = v),
               ),
             ],
           ),
+          if (_isRecurring) ...[
+            const SizedBox(height: 12),
+            // Pattern selector
+            DropdownButtonFormField<String>(
+              value: _recurringPattern,
+              decoration: const InputDecoration(
+                labelText: 'Fréquence',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'daily', child: Text('Tous les jours')),
+                DropdownMenuItem(value: 'weekdays', child: Text('Jours ouvrables (Lun-Ven)')),
+                DropdownMenuItem(value: 'weekly', child: Text('Hebdomadaire')),
+                DropdownMenuItem(value: 'monthly', child: Text('Mensuel')),
+              ],
+              onChanged: (v) => setState(() => _recurringPattern = v!),
+            ),
+            // Day-of-week chips for weekly
+            if (_recurringPattern == 'weekly') ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                children: List.generate(7, (i) {
+                  final selected = _selectedDays.contains(i);
+                  return FilterChip(
+                    label: Text(dayNames[i]),
+                    selected: selected,
+                    selectedColor: AppColor.navy.withOpacity(0.2),
+                    onSelected: (s) {
+                      setState(() {
+                        if (s) {
+                          _selectedDays.add(i);
+                        } else {
+                          _selectedDays.remove(i);
+                        }
+                      });
+                    },
+                  );
+                }),
+              ),
+            ],
+            const SizedBox(height: 12),
+            // Valid until
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _recurringUntil ?? DateTime.now().add(const Duration(days: 30)),
+                  firstDate: DateTime.now().add(const Duration(days: 1)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (picked != null) setState(() => _recurringUntil = picked);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Valable jusqu\'au',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                child: Text(
+                  _recurringUntil != null
+                      ? DateFormat('dd/MM/yyyy').format(_recurringUntil!)
+                      : '30 jours par défaut',
+                  style: TextStyle(
+                    color: _recurringUntil != null ? AppColor.forText : AppColor.fadeText,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

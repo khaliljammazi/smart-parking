@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import '../authentication/auth_service.dart';
 
 class VehicleService {
@@ -163,7 +163,7 @@ class VehicleService {
   /// Upload photos for a vehicle (max 3)
   static Future<Map<String, dynamic>?> uploadPhotos(
     String vehicleId,
-    List<File> files,
+    List<XFile> files,
   ) async {
     try {
       final token = await AuthService.getToken();
@@ -173,13 +173,15 @@ class VehicleService {
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token';
 
-      for (final file in files) {
-        final ext = file.path.split('.').last.toLowerCase();
+      for (final xFile in files) {
+        final ext = xFile.path.split('.').last.toLowerCase();
         final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
+        final bytes = await xFile.readAsBytes();
         request.files.add(
-          await http.MultipartFile.fromPath(
+          http.MultipartFile.fromBytes(
             'photos',
-            file.path,
+            bytes,
+            filename: xFile.name,
             contentType: MediaType.parse(mimeType),
           ),
         );
@@ -190,6 +192,7 @@ class VehicleService {
       if (streamed.statusCode == 200) {
         return json.decode(responseBody);
       }
+      print('Upload photos failed: ${streamed.statusCode} $responseBody');
       return null;
     } catch (e) {
       print('Upload photos error: $e');

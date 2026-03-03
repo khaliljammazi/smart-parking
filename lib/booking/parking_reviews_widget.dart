@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/constanst.dart';
+import '../authentication/auth_service.dart';
 import 'rating_service.dart';
 import 'package:intl/intl.dart';
 
@@ -240,7 +241,12 @@ class _ParkingReviewsWidgetState extends State<ParkingReviewsWidget> {
     final user = review['user'] ?? {};
     final firstName = user['firstName']?.toString() ?? '';
     final lastName = user['lastName']?.toString() ?? '';
-    final avatar = user['avatar']?.toString();
+    final rawAvatar = user['avatar']?.toString();
+    // Avatar is stored as relative path like /uploads/avatars/..., need full URL
+    final serverUrl = AuthService.baseUrl.replaceAll('/api', '');
+    final avatar = (rawAvatar != null && rawAvatar.isNotEmpty)
+        ? (rawAvatar.startsWith('http') ? rawAvatar : '$serverUrl$rawAvatar')
+        : null;
     final rating = (review['rating'] ?? 0).toDouble();
     final reviewText = review['review']?.toString() ?? '';
     final tags = (review['tags'] as List?)?.cast<String>() ?? [];

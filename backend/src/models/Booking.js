@@ -162,7 +162,37 @@ const bookingSchema = new mongoose.Schema({
   cancelledAt: Date,
   cancellationReason: {
     type: String,
-    enum: ['user_cancelled', 'no_show', 'system_cancelled', 'parking_unavailable']
+    enum: ['user_cancelled', 'no_show', 'system_cancelled', 'parking_unavailable', 'expired']
+  },
+
+  // Extension tracking
+  extensions: [{
+    hours: { type: Number, required: true },
+    previousEndTime: { type: Date, required: true },
+    newEndTime: { type: Date, required: true },
+    additionalCost: { type: Number, required: true },
+    extendedAt: { type: Date, default: Date.now }
+  }],
+
+  // Recurring booking
+  recurring: {
+    enabled: { type: Boolean, default: false },
+    pattern: { type: String, enum: ['daily', 'weekdays', 'weekly', 'monthly'] },
+    daysOfWeek: [{ type: Number, min: 0, max: 6 }], // 0=Sun..6=Sat
+    startHour: { type: Number, min: 0, max: 23 },
+    endHour: { type: Number, min: 0, max: 23 },
+    parentBooking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
+    validUntil: { type: Date },
+  },
+
+  // Smart pricing snapshot
+  pricingDetails: {
+    baseRate: Number,
+    appliedRate: Number,
+    isPeak: { type: Boolean, default: false },
+    peakMultiplier: Number,
+    discount: Number,
+    discountType: { type: String, enum: ['off_peak', 'long_stay', 'none'], default: 'none' },
   },
 
   // Ratings & Feedback (after completion)

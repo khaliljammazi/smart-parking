@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 const path = require('path');
+const schedule = require('node-schedule');
 require('dotenv').config();
 
 const app = express();
@@ -85,7 +86,41 @@ app.use('*', (req, res) => {
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart_parking')
-.then(() => console.log('MongoDB connected successfully'))
+.then(() => {
+  console.log('MongoDB connected successfully');
+
+  // ── Auto-cancel cron: every 5 minutes, cancel confirmed bookings that are 30+ min overdue ──
+  const Booking = require('./src/models/Booking');
+  const Parking = require('./src/models/Parking');
+
+  schedule.scheduleJob('*/5 * * * *', async () => {
+    try {
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const expired = await Booking.find({
+        status: 'confirmed',
+        adminValidated: false,
+        startTime: { $lt: thirtyMinAgo }
+      });
+
+      for (const booking of expired) {
+        booking.status = 'cancelled';
+        booking.cancelledAt = new Date();
+        booking.cancellationReason = 'expired';
+        await booking.save();
+
+        await Parking.findByIdAndUpdate(booking.parking, {
+          $inc: { availableSpots: 1 }
+        });
+      }
+
+      if (expired.length > 0) {
+        console.log(`[CRON] Auto-cancelled ${expired.length} expired booking(s)`);
+      }
+    } catch (err) {
+      console.error('[CRON] auto-cancel error:', err);
+    }
+  });
+})
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Start server

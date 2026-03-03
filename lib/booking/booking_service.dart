@@ -297,4 +297,103 @@ class BookingService {
       return null;
     }
   }
+
+  // Calculate smart price preview
+  static Future<Map<String, dynamic>?> calculateSmartPrice({
+    required String parkingId,
+    required String startTime,
+    required String endTime,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/bookings/calculate-price'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'parkingId': parkingId,
+          'startTime': startTime,
+          'endTime': endTime,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      print('Error calculating smart price: $e');
+      return null;
+    }
+  }
+
+  // Create recurring booking series
+  static Future<Map<String, dynamic>?> createRecurringBooking({
+    required String parkingId,
+    String? vehicleId,
+    required String pattern,
+    List<int>? daysOfWeek,
+    required int startHour,
+    required int endHour,
+    String? validUntil,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/bookings/recurring'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'parkingId': parkingId,
+          if (vehicleId != null) 'vehicleId': vehicleId,
+          'pattern': pattern,
+          if (daysOfWeek != null) 'daysOfWeek': daysOfWeek,
+          'startHour': startHour,
+          'endHour': endHour,
+          if (validUntil != null) 'validUntil': validUntil,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error creating recurring booking: $e');
+      return null;
+    }
+  }
+
+  // Cancel all future recurring bookings
+  static Future<Map<String, dynamic>?> cancelRecurringBookings(String parentId) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return null;
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/bookings/recurring/$parentId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error cancelling recurring bookings: $e');
+      return null;
+    }
+  }
 }

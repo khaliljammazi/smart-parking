@@ -147,13 +147,24 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
           // Validate the booking by scanning QR code
           final result = await BookingService.adminValidateQRCode(code);
           if (result != null && mounted) {
-            // Show validation success
+            final data = result['data'];
+            final action = data?['action'] ?? 'checkin';
+            final booking = data?['booking'] ?? {};
+            final userName = booking['user']?['name'] ?? 'Inconnu';
+            final vehicle = booking['vehicle']?['licensePlate'] ?? 'Aucun';
+            final status = booking['status'] ?? '';
+
+            final isCheckout = action == 'checkout';
+
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Réservation validée avec succès !\nClient : ${result['user']?['name'] ?? 'Inconnu'}\nVéhicule : ${result['vehicle']?['licensePlate'] ?? 'Aucun'}',
+                  isCheckout
+                      ? 'Check-out effectué !\nClient : $userName\nVéhicule : $vehicle\nStatut : Terminé'
+                      : 'Check-in effectué — Réservation activée !\nClient : $userName\nVéhicule : $vehicle\nStatut : $status',
                 ),
-                backgroundColor: Colors.green,
+                backgroundColor: isCheckout ? Colors.blue : Colors.green,
+                duration: const Duration(seconds: 4),
               ),
             );
             _loadDashboardData(); // Refresh dashboard

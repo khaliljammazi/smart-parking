@@ -6,12 +6,16 @@ class BookingActionsDialog extends StatelessWidget {
   final String bookingId;
   final String status;
   final VoidCallback onUpdate;
+  final String? parkingId;
+  final String? endTime;
 
   const BookingActionsDialog({
     super.key,
     required this.bookingId,
     required this.status,
     required this.onUpdate,
+    this.parkingId,
+    this.endTime,
   });
 
   @override
@@ -73,67 +77,170 @@ class BookingActionsDialog extends StatelessWidget {
 
   void _showExtendDialog(BuildContext context) {
     int selectedHours = 1;
+    Map<String, dynamic>? pricePreview;
+    bool loadingPrice = false;
+
+    Future<void> fetchPrice(StateSetter setState) async {
+      if (parkingId == null || endTime == null) return;
+      setState(() => loadingPrice = true);
+      final end = DateTime.parse(endTime!);
+      final newEnd = end.add(Duration(hours: selectedHours));
+      final result = await BookingService.calculateSmartPrice(
+        parkingId: parkingId!,
+        startTime: end.toIso8601String(),
+        endTime: newEnd.toIso8601String(),
+      );
+      setState(() {
+        pricePreview = result;
+        loadingPrice = false;
+      });
+    }
     
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Prolonger la réservation'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Combien d\'heures souhaitez-vous ajouter?'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: selectedHours > 1
-                        ? () => setState(() => selectedHours--)
-                        : null,
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+        builder: (context, setState) {
+          // Fetch price on first build
+          if (pricePreview == null && !loadingPrice && parkingId != null) {
+            fetchPrice(setState);
+          }
+
+          return AlertDialog(
+            title: const Text('Prolonger la réservation'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Combien d\'heures souhaitez-vous ajouter?'),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: selectedHours > 1
+                          ? () {
+                              setState(() => selectedHours--);
+                              fetchPrice(setState);
+                            }
+                          : null,
                     ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColor.navy),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$selectedHours h',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColor.navy),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$selectedHours h',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: selectedHours < 12
+                          ? () {
+                              setState(() => selectedHours++);
+                              fetchPrice(setState);
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
+                // Price preview
+                if (loadingPrice)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: selectedHours < 12
-                        ? () => setState(() => selectedHours++)
-                        : null,
+                if (pricePreview != null && !loadingPrice) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Coût supplémentaire',
+                                style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            Text('${(pricePreview!['total'] ?? 0).toStringAsFixed(2)} DT',
+                                style: const TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.bold, color: AppColor.navy)),
+                          ],
+                        ),
+                        if (pricePreview!['isPeak'] == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.trending_up, size: 14, color: Colors.red),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Tarif heures de pointe (x${pricePreview!['peakMultiplier']})',
+                                  style: const TextStyle(fontSize: 11, color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (pricePreview!['discountType'] == 'off_peak')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.trending_down, size: 14, color: Colors.green),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Réduction hors pointe -${(pricePreview!['discount'] ?? 0).toStringAsFixed(0)}%',
+                                  style: const TextStyle(fontSize: 11, color: Colors.green),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (pricePreview!['discountType'] == 'long_stay')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.access_time_filled, size: 14, color: Colors.teal),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Réduction longue durée -${(pricePreview!['discount'] ?? 0).toStringAsFixed(0)}%',
+                                  style: const TextStyle(fontSize: 11, color: Colors.teal),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => _extendBooking(context, selectedHours),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.navy,
+                ),
+                child: const Text('Confirmer'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => _extendBooking(context, selectedHours),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.navy,
-              ),
-              child: const Text('Confirmer'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

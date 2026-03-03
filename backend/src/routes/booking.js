@@ -862,4 +862,446 @@ router.put('/:id/rate', protect, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════
+//  SMART PRICING — calculate price with surge/discount
+// ═══════════════════════════════════════════════
+
+function calculateSmartPrice(parking, startTime, endTime) {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const durationMs = end - start;
+  const durationHours = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60)));
+  const baseRate = parking.pricing.hourly || 1;
+
+  let appliedRate = baseRate;
+  let isPeak = false;
+  let peakMultiplier = 1;
+  let discount = 0;
+  let discountType = 'none';
+
+  const sp = parking.smartPricing;
+  if (sp && sp.enabled) {
+    const hour = start.getHours();
+    const day = start.getDay();
+    const peakDays = sp.peakDays && sp.peakDays.length > 0
+      ? sp.peakDays
+      : [1, 2, 3, 4, 5]; // Mon-Fri default
+
+    // Check peak hours
+    const inPeakHour = hour >= (sp.peakHours?.start ?? 8) && hour < (sp.peakHours?.end ?? 18);
+    const inPeakDay = peakDays.includes(day);
+
+    if (inPeakHour && inPeakDay) {
+      isPeak = true;
+      peakMultiplier = sp.peakMultiplier || 1.5;
+      appliedRate = baseRate * peakMultiplier;
+    } else {
+      // Off-peak discount
+      discount = sp.offPeakDiscount || 20;
+      discountType = 'off_peak';
+      appliedRate = baseRate * (1 - discount / 100);
+    }
+
+    // Long stay discount overrides off-peak if greater
+    if (durationHours >= (sp.longStayThreshold || 6)) {
+      const longDiscount = sp.longStayDiscount || 10;
+      if (longDiscount > discount || isPeak) {
+        discount = longDiscount;
+        discountType = 'long_stay';
+        // Apply long-stay discount on top of base (or peak) rate
+        appliedRate = (isPeak ? baseRate * peakMultiplier : baseRate) * (1 - longDiscount / 100);
+      }
+    }
+  }
+
+  const subtotal = Math.round(durationHours * appliedRate * 100) / 100;
+  const tax = Math.round(subtotal * 0.19 * 100) / 100;
+  const total = Math.round((subtotal + tax) * 100) / 100;
+
+  return {
+    baseRate,
+    appliedRate: Math.round(appliedRate * 100) / 100,
+    isPeak,
+    peakMultiplier: isPeak ? peakMultiplier : 1,
+    discount,
+    discountType,
+    durationHours,
+    subtotal,
+    tax,
+    total
+  };
+}
+
+// @route   POST /api/bookings/calculate-price
+// @desc    Calculate smart price for a booking (preview before confirming)
+// @access  Private
+router.post('/calculate-price', protect, async (req, res) => {
+  try {
+    const { parkingId, startTime, endTime } = req.body;
+    const parking = await Parking.findById(parkingId);
+    if (!parking) return res.status(404).json({ success: false, message: 'Parking non trouvé' });
+
+    const result = calculateSmartPrice(parking, startTime, endTime);
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        smartPricingEnabled: parking.smartPricing?.enabled || false,
+      }
+    });
+  } catch (error) {
+    console.error('Calculate price error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  EXTEND RESERVATION
+// ═══════════════════════════════════════════════
+
+// @route   PUT /api/bookings/:id/extend
+// @desc    Extend an active/confirmed reservation by N hours
+// @access  Private
+router.put('/:id/extend', protect, async (req, res) => {
+  try {
+    const { additionalHours } = req.body;
+    if (!additionalHours || additionalHours < 1 || additionalHours > 24) {
+      return res.status(400).json({ success: false, message: 'Heures additionnelles invalides (1-24)' });
+    }
+
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      status: { $in: ['confirmed', 'active'] }
+    }).populate('parking');
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Réservation active non trouvée' });
+    }
+
+    const previousEndTime = new Date(booking.endTime);
+    const newEndTime = new Date(previousEndTime.getTime() + additionalHours * 60 * 60 * 1000);
+
+    // Check for conflicts with other bookings in the extended window
+    const conflict = await Booking.findOne({
+      _id: { $ne: booking._id },
+      parking: booking.parking._id,
+      status: { $in: ['confirmed', 'active'] },
+      startTime: { $lt: newEndTime },
+      endTime: { $gt: previousEndTime }
+    });
+
+    if (conflict) {
+      return res.status(400).json({ success: false, message: 'Conflit : une autre réservation occupe ce créneau' });
+    }
+
+    // Calculate additional cost using smart pricing
+    const priceInfo = calculateSmartPrice(booking.parking, previousEndTime, newEndTime);
+    const additionalCost = priceInfo.total;
+
+    // Save extension record
+    booking.extensions = booking.extensions || [];
+    booking.extensions.push({
+      hours: additionalHours,
+      previousEndTime,
+      newEndTime,
+      additionalCost,
+    });
+
+    booking.endTime = newEndTime;
+    // Add additional cost to pricing
+    booking.pricing.subtotal = (booking.pricing.subtotal || 0) + priceInfo.subtotal;
+    booking.pricing.tax = (booking.pricing.tax || 0) + priceInfo.tax;
+    booking.pricing.total = (booking.pricing.total || 0) + priceInfo.total;
+
+    await booking.save();
+
+    // Reschedule expiry push
+    try {
+      if (schedule.scheduledJobs[`expiry_${booking._id}`]) {
+        schedule.scheduledJobs[`expiry_${booking._id}`].cancel();
+      }
+      schedule.scheduleJob(`expiry_${booking._id}`, newEndTime, async () => {
+        const u = await User.findById(booking.user);
+        const tokens = (u.deviceTokens || []).map(t => t.token).filter(Boolean);
+        if (tokens.length) {
+          await pushUtil.sendPushToTokens(tokens, {
+            notification: { title: 'Fin de réservation', body: `Votre réservation est terminée.` },
+            data: { bookingId: booking._id.toString(), type: 'expiry' }
+          });
+        }
+      });
+    } catch (schedErr) {
+      console.error('Reschedule push error:', schedErr);
+    }
+
+    res.json({
+      success: true,
+      message: `Réservation prolongée de ${additionalHours}h`,
+      data: {
+        booking,
+        extension: {
+          hours: additionalHours,
+          previousEndTime,
+          newEndTime,
+          additionalCost,
+          newTotal: booking.pricing.total
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Extend booking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  RECURRING BOOKINGS
+// ═══════════════════════════════════════════════
+
+// @route   POST /api/bookings/recurring
+// @desc    Create recurring booking series
+// @access  Private
+router.post('/recurring', protect, async (req, res) => {
+  try {
+    const { parkingId, vehicleId, pattern, daysOfWeek, startHour, endHour, validUntil } = req.body;
+
+    // Validate
+    if (!parkingId || !pattern || startHour === undefined || endHour === undefined) {
+      return res.status(400).json({ success: false, message: 'Champs requis manquants' });
+    }
+    if (!['daily', 'weekdays', 'weekly', 'monthly'].includes(pattern)) {
+      return res.status(400).json({ success: false, message: 'Modèle de récurrence invalide' });
+    }
+    if (endHour <= startHour) {
+      return res.status(400).json({ success: false, message: 'L\'heure de fin doit être après l\'heure de début' });
+    }
+
+    const parking = await Parking.findById(parkingId);
+    if (!parking || !parking.isActive) {
+      return res.status(404).json({ success: false, message: 'Parking non trouvé ou inactif' });
+    }
+
+    let vehicle = null;
+    if (vehicleId) {
+      vehicle = await Vehicle.findOne({ _id: vehicleId, owner: req.user._id });
+      if (!vehicle) return res.status(404).json({ success: false, message: 'Véhicule non trouvé' });
+    }
+
+    const until = validUntil ? new Date(validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days default
+    const now = new Date();
+    const bookings = [];
+    const errors = [];
+
+    // Generate dates
+    let currentDate = new Date(now);
+    currentDate.setHours(startHour, 0, 0, 0);
+    if (currentDate <= now) currentDate.setDate(currentDate.getDate() + 1);
+
+    let parentId = null;
+    let count = 0;
+    const MAX_BOOKINGS = 60; // max 60 occurrences
+
+    while (currentDate <= until && count < MAX_BOOKINGS) {
+      const day = currentDate.getDay();
+      let shouldBook = false;
+
+      switch (pattern) {
+        case 'daily':
+          shouldBook = true;
+          break;
+        case 'weekdays':
+          shouldBook = day >= 1 && day <= 5;
+          break;
+        case 'weekly':
+          shouldBook = daysOfWeek && daysOfWeek.includes(day);
+          break;
+        case 'monthly':
+          shouldBook = currentDate.getDate() === now.getDate();
+          break;
+      }
+
+      if (shouldBook) {
+        const start = new Date(currentDate);
+        const end = new Date(currentDate);
+        end.setHours(endHour, 0, 0, 0);
+
+        const durationHours = endHour - startHour;
+        const priceInfo = calculateSmartPrice(parking, start, end);
+
+        try {
+          const booking = new Booking({
+            user: req.user._id,
+            parking: parkingId,
+            vehicle: vehicleId || null,
+            bookingType: 'hourly',
+            startTime: start,
+            endTime: end,
+            duration: { hours: durationHours },
+            pricing: {
+              rate: priceInfo.appliedRate,
+              subtotal: priceInfo.subtotal,
+              tax: priceInfo.tax,
+              total: priceInfo.total
+            },
+            pricingDetails: {
+              baseRate: priceInfo.baseRate,
+              appliedRate: priceInfo.appliedRate,
+              isPeak: priceInfo.isPeak,
+              peakMultiplier: priceInfo.peakMultiplier,
+              discount: priceInfo.discount,
+              discountType: priceInfo.discountType,
+            },
+            recurring: {
+              enabled: true,
+              pattern,
+              daysOfWeek: daysOfWeek || [],
+              startHour,
+              endHour,
+              parentBooking: parentId,
+              validUntil: until,
+            },
+            payment: { status: 'pending', method: 'cash' }
+          });
+
+          await booking.save();
+          if (!parentId) parentId = booking._id;
+          bookings.push(booking);
+          count++;
+        } catch (bookErr) {
+          errors.push({ date: start.toISOString(), error: bookErr.message });
+        }
+      }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setHours(startHour, 0, 0, 0);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `${bookings.length} réservation(s) récurrente(s) créée(s)`,
+      data: {
+        count: bookings.length,
+        pattern,
+        validUntil: until,
+        bookings: bookings.map(b => ({
+          id: b._id,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          total: b.pricing.total,
+          status: b.status,
+        })),
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    console.error('Recurring booking error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/bookings/recurring/:parentId
+// @desc    Cancel all future recurring bookings by parent ID
+// @access  Private
+router.delete('/recurring/:parentId', protect, async (req, res) => {
+  try {
+    const now = new Date();
+    const result = await Booking.updateMany(
+      {
+        user: req.user._id,
+        $or: [
+          { 'recurring.parentBooking': req.params.parentId },
+          { _id: req.params.parentId }
+        ],
+        startTime: { $gt: now },
+        status: { $in: ['pending', 'confirmed'] }
+      },
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledAt: now,
+          cancellationReason: 'user_cancelled'
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} réservation(s) annulée(s)`,
+      data: { cancelledCount: result.modifiedCount }
+    });
+  } catch (error) {
+    console.error('Cancel recurring error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════
+//  AUTO-CANCEL EXPIRED CONFIRMED BOOKINGS
+// ═══════════════════════════════════════════════
+
+// @route   POST /api/bookings/cleanup-expired
+// @desc    Cancel confirmed bookings whose start time has passed by 30+ minutes without check-in
+// @access  Private (admin or cron)
+router.post('/cleanup-expired', async (req, res) => {
+  try {
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    const expired = await Booking.find({
+      status: 'confirmed',
+      adminValidated: false,
+      startTime: { $lt: thirtyMinAgo }
+    }).populate('parking user');
+
+    let cancelledCount = 0;
+    for (const booking of expired) {
+      booking.status = 'cancelled';
+      booking.cancelledAt = new Date();
+      booking.cancellationReason = 'expired';
+      await booking.save();
+
+      // Release parking spot
+      if (booking.parking) {
+        await Parking.findByIdAndUpdate(booking.parking._id || booking.parking, {
+          $inc: { availableSpots: 1 }
+        });
+      }
+
+      // Notify user
+      try {
+        if (booking.user && booking.user.deviceTokens) {
+          const tokens = booking.user.deviceTokens.map(t => t.token).filter(Boolean);
+          if (tokens.length) {
+            await pushUtil.sendPushToTokens(tokens, {
+              notification: {
+                title: 'Réservation expirée',
+                body: `Votre réservation a été annulée car vous ne vous êtes pas présenté dans les 30 minutes.`
+              },
+              data: { bookingId: booking._id.toString(), type: 'expired' }
+            });
+          }
+        }
+      } catch (pushErr) {
+        console.error('Expired push error:', pushErr);
+      }
+
+      cancelledCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `${cancelledCount} réservation(s) expirée(s) annulée(s)`,
+      data: { cancelledCount }
+    });
+  } catch (error) {
+    console.error('Cleanup expired error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
