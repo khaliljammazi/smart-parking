@@ -129,11 +129,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  role: {
-    type: String,
-    enum: ['user', 'parking_operator', 'admin', 'super_admin'],
-    default: 'user'
-  },
+ role: {
+  type: String,
+  enum: ['user', 'parking_operator', 'admin', 'super_admin', 'parking_owner'],
+  default: 'user'
+},
   emailVerificationToken: String,
   emailVerificationExpires: Date,
   passwordResetToken: String,

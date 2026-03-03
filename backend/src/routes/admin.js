@@ -286,6 +286,139 @@ router.delete('/users/:id', protect, requireAdmin, async (req, res) => {
   }
 });
 
+// ── Admin Vehicle Management ──
+const Vehicle = require('../models/Vehicle');
+
+// @route   GET /api/admin/vehicles
+// @desc    List all vehicles across all users with search/filter
+// @access  Private (Admin only)
+router.get('/vehicles', protect, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, type, verified } = req.query;
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { licensePlate: { $regex: search, $options: 'i' } },
+        { make: { $regex: search, $options: 'i' } },
+        { model: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (type) query.type = type;
+    if (verified !== undefined) query.isVerified = verified === 'true';
+
+    const vehicles = await Vehicle.find(query)
+      .populate('owner', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Vehicle.countDocuments(query);
+
+    // Counts by type
+    const typeCounts = await Vehicle.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        vehicles,
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        typeCounts: typeCounts.reduce((acc, t) => { acc[t._id] = t.count; return acc; }, {})
+      }
+    });
+  } catch (error) {
+    console.error('Admin get vehicles error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/vehicles/:id/verify
+// @desc    Verify or reject a vehicle
+// @access  Private (Admin only)
+router.put('/vehicles/:id/verify', protect, requireAdmin, async (req, res) => {
+  try {
+    const { verified } = req.body; // true or false
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    vehicle.isVerified = !!verified;
+    await vehicle.save();
+
+    res.json({
+      success: true,
+      data: vehicle,
+      message: verified ? 'Véhicule vérifié' : 'Véhicule rejeté'
+    });
+  } catch (error) {
+    console.error('Admin verify vehicle error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/vehicles/stats
+// @desc    Vehicle statistics for admin dashboard
+// @access  Private (Admin only)
+router.get('/vehicles/stats', protect, requireAdmin, async (req, res) => {
+  try {
+    const totalVehicles = await Vehicle.countDocuments();
+    const verifiedVehicles = await Vehicle.countDocuments({ isVerified: true });
+    const typeCounts = await Vehicle.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]);
+    const fuelCounts = await Vehicle.aggregate([
+      { $group: { _id: '$fuelType', count: { $sum: 1 } } }
+    ]);
+
+    // Top vehicles by bookings
+    const topVehicles = await Booking.aggregate([
+      { $match: { vehicle: { $ne: null } } },
+      { $group: { _id: '$vehicle', totalBookings: { $sum: 1 }, totalSpent: { $sum: '$pricing.total' } } },
+      { $lookup: { from: 'vehicles', localField: '_id', foreignField: '_id', as: 'vehicle' } },
+      { $unwind: '$vehicle' },
+      { $lookup: { from: 'users', localField: 'vehicle.owner', foreignField: '_id', as: 'owner' } },
+      { $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+      { $project: {
+        licensePlate: '$vehicle.licensePlate',
+        make: '$vehicle.make',
+        model: '$vehicle.model',
+        ownerName: { $concat: ['$owner.firstName', ' ', '$owner.lastName'] },
+        totalBookings: 1,
+        totalSpent: 1
+      }},
+      { $sort: { totalBookings: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Vehicles with expiring insurance (next 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const expiringInsurance = await Vehicle.find({
+      insuranceExpiry: { $lte: thirtyDaysFromNow, $gte: new Date() }
+    }).populate('owner', 'firstName lastName email').limit(20);
+
+    res.json({
+      success: true,
+      data: {
+        totalVehicles,
+        verifiedVehicles,
+        typeCounts: typeCounts.reduce((acc, t) => { acc[t._id] = t.count; return acc; }, {}),
+        fuelCounts: fuelCounts.reduce((acc, t) => { acc[t._id] = t.count; return acc; }, {}),
+        topVehicles,
+        expiringInsurance
+      }
+    });
+  } catch (error) {
+    console.error('Admin vehicle stats error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Support tickets management for admins
 const SupportTicket = require('../models/SupportTicket');
 

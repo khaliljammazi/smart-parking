@@ -9,7 +9,7 @@ import 'manage_admins_page.dart';
 import 'admin_qr_scan_page.dart';
 import 'reports_page.dart';
 import '../parkinglist/parking_list_page.dart';
-import '../vehicle/vehicle_management_page.dart';
+import 'admin_vehicle_dashboard_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -243,7 +243,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Colors.indigo,
             () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const VehicleManagementPage()),
+              MaterialPageRoute(builder: (context) => const AdminVehicleDashboardPage()),
             ),
           ),
       ],

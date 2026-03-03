@@ -76,6 +76,17 @@ const parkingSchema = new mongoose.Schema({
     }
   },
 
+  // Slot Types (breakdown of totalSpots by vehicle size)
+  slotTypes: [{
+    type: {
+      type: String,
+      enum: ['motorcycle', 'compact', 'standard', 'large', 'ev_charging'],
+      required: true
+    },
+    count: { type: Number, required: true, min: 0 },
+    available: { type: Number, min: 0 }
+  }],
+
   // Features & Amenities
   features: [{
     type: String,
