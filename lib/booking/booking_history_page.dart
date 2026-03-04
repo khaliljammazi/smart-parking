@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'dart:async';
 import '../booking/booking_service.dart';
 import '../utils/constanst.dart';
@@ -119,9 +122,69 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
       final result = await BookingService.checkOut(bookingId);
       if (result != null && mounted) {
         _loadBookings();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Checked out successfully')),
-        );
+        // Show pricing dialog
+        final booking = result['data']?['booking'];
+        final pricing = booking?['pricing'];
+        if (pricing != null && mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Check-out effectué !', style: TextStyle(fontSize: 18))),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('💰 Montant à payer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 12),
+                        _buildReceiptRow('Tarif/h', '${(pricing['rate'] ?? 0).toStringAsFixed(2)} DT'),
+                        _buildReceiptRow('Sous-total', '${(pricing['subtotal'] ?? 0).toStringAsFixed(2)} DT'),
+                        _buildReceiptRow('TVA (19%)', '${(pricing['tax'] ?? 0).toStringAsFixed(2)} DT'),
+                        const Divider(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('${(pricing['total'] ?? 0).toStringAsFixed(2)} DT',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Veuillez payer ce montant au parking.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColor.navy, foregroundColor: Colors.white),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Check-out effectué !'), backgroundColor: Colors.green),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -177,7 +240,222 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
 
     Share.share(text, subject: 'Ma r\u00e9servation - $parkingName');
   }
+  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
+    final bookingId = booking['_id']?.toString() ?? '';
+    if (bookingId.isEmpty) return;
 
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler la réservation'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir annuler cette réservation ?\n\n'
+          'Note : L\'annulation est possible uniquement 2h avant l\'heure de début.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Non'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Oui, annuler'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final result = await BookingService.cancelBooking(bookingId, reason: 'user_cancelled');
+    if (result != null && mounted) {
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Réservation annulée avec succès'), backgroundColor: Colors.green),
+        );
+        _loadBookings();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ ${result['message'] ?? 'Échec de l\'annulation'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ Erreur de connexion'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _exportBookingsPDF() async {
+    if (_bookings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune réservation à exporter')),
+      );
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Génération du PDF...')],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final pdf = pw.Document();
+      final now = DateTime.now();
+      final dateStr = DateFormat('dd/MM/yyyy').format(now);
+
+      // Styles
+      final headerStyle = pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900);
+      final sectionStyle = pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo800);
+      final cellStyle = const pw.TextStyle(fontSize: 10);
+      final cellBoldStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Smart Parking', style: headerStyle),
+                  pw.Text('Historique - $dateStr', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                ],
+              ),
+              pw.Divider(color: PdfColors.indigo900, thickness: 2),
+              pw.SizedBox(height: 8),
+            ],
+          ),
+          build: (context) {
+            final rows = <pw.TableRow>[
+              // Table header
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.indigo50),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Parking', style: cellBoldStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Date', style: cellBoldStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Durée', style: cellBoldStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Statut', style: cellBoldStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Prix (DT)', style: cellBoldStyle)),
+                ],
+              ),
+            ];
+
+            double totalSpent = 0;
+
+            for (final b in _bookings) {
+              final p = b['parking'] ?? {};
+              final st = b['startTime'] != null ? DateTime.parse(b['startTime']) : null;
+              final et = b['endTime'] != null ? DateTime.parse(b['endTime']) : null;
+              final checkIn = b['checkInTime'] != null ? DateTime.parse(b['checkInTime']) : null;
+              final checkOut = b['checkOutTime'] != null ? DateTime.parse(b['checkOutTime']) : null;
+              final status = b['status'] ?? 'pending';
+              final pricing = b['pricing'];
+              final total = (pricing?['total'] ?? 0).toDouble();
+              if (status == 'completed') totalSpent += total;
+
+              // Use actual check-in/check-out times for completed bookings
+              String durStr = '-';
+              if (status == 'completed' && checkIn != null && checkOut != null) {
+                final dur = checkOut.difference(checkIn);
+                durStr = dur.inHours > 0 ? '${dur.inHours}h ${dur.inMinutes.remainder(60)}min' : '${dur.inMinutes}min';
+              } else if (st != null && et != null) {
+                final dur = et.difference(st);
+                durStr = dur.inHours > 0 ? '${dur.inHours}h ${dur.inMinutes.remainder(60)}min' : '${dur.inMinutes}min';
+              }
+
+              final dateDisplay = st != null ? DateFormat('dd/MM/yy HH:mm').format(st) : '-';
+
+              String statusLabel;
+              switch (status) {
+                case 'confirmed': statusLabel = 'Confirmé'; break;
+                case 'active': statusLabel = 'Actif'; break;
+                case 'completed': statusLabel = 'Terminé'; break;
+                case 'cancelled': statusLabel = 'Annulé'; break;
+                default: statusLabel = status;
+              }
+
+              rows.add(pw.TableRow(
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(p['name'] ?? '', style: cellStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(dateDisplay, style: cellStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(durStr, style: cellStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(statusLabel, style: cellStyle)),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(total > 0 ? total.toStringAsFixed(2) : '-', style: cellStyle)),
+                ],
+              ));
+            }
+
+            return [
+              pw.Text('Historique des réservations', style: sectionStyle),
+              pw.SizedBox(height: 10),
+              pw.Text('Total réservations: ${_bookings.length}', style: cellStyle),
+              pw.SizedBox(height: 10),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                children: rows,
+              ),
+              pw.SizedBox(height: 16),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.green50,
+                  border: pw.Border.all(color: PdfColors.green),
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Total dépensé:', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('${totalSpent.toStringAsFixed(2)} DT', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text('Document généré le $dateStr via Smart Parking', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+            ];
+          },
+          footer: (context) => pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Page ${context.pageNumber}/${context.pagesCount}', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+          ),
+        ),
+      );
+
+      final bytes = await pdf.save();
+      final fileName = 'SmartParking_Historique_${DateFormat('dd_MM_yyyy').format(now)}.pdf';
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // close loading
+
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur export PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -190,25 +468,46 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            tooltip: 'Exporter en PDF',
+            onPressed: _exportBookingsPDF,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _bookings.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Aucune réservation',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+              ? RefreshIndicator(
+                  onRefresh: _loadBookings,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucune réservation',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tirez vers le bas pour rafraîchir',
+                              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 )
               : RefreshIndicator(
@@ -234,10 +533,17 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     final endTime = booking['endTime'] != null
         ? DateTime.parse(booking['endTime'])
         : null;
+    final checkInTime = booking['checkInTime'] != null
+        ? DateTime.parse(booking['checkInTime'])
+        : null;
+    final checkOutTime = booking['checkOutTime'] != null
+        ? DateTime.parse(booking['checkOutTime'])
+        : null;
     final qrCode = booking['qrCode'];
     final adminValidated = booking['adminValidated'] ?? false;
     final isRecurring = booking['recurring']?['enabled'] == true;
     final cancellationReason = booking['cancellationReason'];
+    final pricing = booking['pricing'];
 
     // Construct address string from address object
     final address = parking['address'];
@@ -462,6 +768,26 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         ),
                     ],
                   ),
+                  // Cancel button for confirmed bookings
+                  if (status == 'confirmed')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _cancelBooking(booking),
+                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          label: const Text('Annuler la réservation'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   // Extend + Actions row for active bookings
                   if (status == 'active')
                     Padding(
@@ -496,25 +822,75 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
 
             // Rate button for completed bookings
             if (status == 'completed')
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showRatingDialog(booking),
-                    icon: const Icon(Icons.star, color: Colors.white),
-                    label: Text(
-                      booking['rating'] != null ? 'Modifier votre avis' : 'Évaluer ce parking',
-                      style: const TextStyle(color: Colors.white),
+              Column(
+                children: [
+                  // Pricing summary for completed bookings
+                  if (pricing != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.receipt_long, size: 16, color: Colors.green.shade700),
+                                const SizedBox(width: 6),
+                                Text('Facture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade700)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            if (checkInTime != null && checkOutTime != null)
+                              _buildReceiptRow('Durée réelle', () {
+                                final dur = checkOutTime.difference(checkInTime);
+                                return dur.inHours > 0
+                                    ? '${dur.inHours}h ${dur.inMinutes.remainder(60)}min'
+                                    : '${dur.inMinutes}min';
+                              }()),
+                            _buildReceiptRow('Tarif/h', '${(pricing['rate'] ?? 0).toStringAsFixed(2)} DT'),
+                            _buildReceiptRow('Sous-total', '${(pricing['subtotal'] ?? 0).toStringAsFixed(2)} DT'),
+                            _buildReceiptRow('TVA (19%)', '${(pricing['tax'] ?? 0).toStringAsFixed(2)} DT'),
+                            const Divider(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green.shade800)),
+                                Text('${(pricing['total'] ?? 0).toStringAsFixed(2)} DT',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green.shade800)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[700],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showRatingDialog(booking),
+                        icon: const Icon(Icons.star, color: Colors.white),
+                        label: Text(
+                          booking['rating'] != null ? 'Modifier votre avis' : 'Évaluer ce parking',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber[700],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
 
             // Share button
@@ -547,7 +923,18 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     final now = DateTime.now();
 
     if (status == 'confirmed') {
-      // Countdown to check-in deadline (startTime + 30 min)
+      if (now.isBefore(startTime)) {
+        // Before start — count down to start
+        final toStart = startTime.difference(now);
+        return _buildTimerWidget(
+          icon: Icons.hourglass_top,
+          label: 'Commence dans',
+          duration: toStart,
+          color: Colors.blue,
+        );
+      }
+
+      // After start — check-in deadline (startTime + 30 min)
       final deadline = startTime.add(const Duration(minutes: 30));
       final remaining = deadline.difference(now);
 
@@ -571,17 +958,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
               ],
             ),
           ),
-        );
-      }
-
-      if (now.isBefore(startTime)) {
-        // Before start — count down to start
-        final toStart = startTime.difference(now);
-        return _buildTimerWidget(
-          icon: Icons.hourglass_top,
-          label: 'Commence dans',
-          duration: toStart,
-          color: Colors.blue,
         );
       }
 
@@ -689,6 +1065,19 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
             Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }

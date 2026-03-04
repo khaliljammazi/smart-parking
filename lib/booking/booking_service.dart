@@ -247,8 +247,8 @@ class BookingService {
       final token = await AuthService.getToken();
       if (token == null) return null;
 
-      final response = await http.delete(
-        Uri.parse('$baseUrl/bookings/$bookingId'),
+      final response = await http.put(
+        Uri.parse('$baseUrl/bookings/$bookingId/cancel'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -260,8 +260,10 @@ class BookingService {
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
+      } else {
+        final body = json.decode(response.body);
+        return {'success': false, 'message': body['message'] ?? 'Erreur'};
       }
-      return null;
     } catch (e) {
       print('Error cancelling booking: $e');
       return null;

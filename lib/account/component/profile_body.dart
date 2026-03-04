@@ -245,7 +245,6 @@ class _ProfileBodyState extends State<ProfileBody> {
     return SingleChildScrollView(
       child: Column(
         children: [
-          const SizedBox(height: 18),
           const ProfileHeader(),
           const ProfileMenu(iconData: Icons.person, textData: 'Informations Personnelles', page: ProfilePage()),
           const Divider(height: 8),

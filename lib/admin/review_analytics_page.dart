@@ -229,7 +229,11 @@ class _ReviewAnalyticsPageState extends State<ReviewAnalyticsPage>
   Widget _buildDistributionChart(List distribution, int total) {
     final Map<int, int> counts = {};
     for (final d in distribution) {
-      counts[d['_id'] ?? 0] = d['count'] ?? 0;
+      final rawId = d['_id'];
+      final id = rawId is num ? rawId.toInt() : 0;
+      final rawCount = d['count'];
+      final count = rawCount is num ? rawCount.toInt() : 0;
+      counts[id] = count;
     }
 
     return Card(

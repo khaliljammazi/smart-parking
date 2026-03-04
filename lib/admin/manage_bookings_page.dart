@@ -368,6 +368,41 @@ class _ManageBookingsPageState extends State<ManageBookingsPage> {
                 ),
               ],
             ),
+
+            // Pricing (for completed bookings)
+            if (booking['pricing'] != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(isDark ? 0.15 : 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.receipt_long, size: 16, color: Colors.amber[700]),
+                        const SizedBox(width: 6),
+                        Text('Montant total',
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.grey[700])),
+                      ],
+                    ),
+                    Text(
+                      '${((booking['pricing']?['total'] ?? 0) is num ? (booking['pricing']['total'] as num).toStringAsFixed(2) : '0.00')} DT',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -118,6 +118,7 @@ class _MyAppState extends State<MyApp> {
       builder: (context, themeProvider, authProvider, languageProvider, child) {
         return MaterialApp(
           title: 'Parking Intelligent',
+          debugShowCheckedModeBanner: false,
           theme: themeProvider.lightTheme,
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.isDarkMode

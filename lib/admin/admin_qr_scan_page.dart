@@ -253,6 +253,8 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
             ? TabBar(
                 controller: _tabController,
                 indicatorColor: Colors.white,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
                 tabs: const [
                   Tab(text: 'Tableau de bord'),
                   Tab(text: 'Scanner'),
@@ -599,6 +601,20 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
   final TextEditingController _manualQrController = TextEditingController();
   Map<String, dynamic>? _lastScanResult;
 
+  // ──── Helper: safe string from dynamic (avoids _JsonMap errors) ─────
+  String _str(dynamic v) {
+    if (v == null) return '';
+    if (v is String) return v;
+    if (v is Map) {
+      // Handle address objects like {street, city, ...}
+      final parts = [v['street'], v['city'], v['country']]
+          .where((e) => e != null && e.toString().isNotEmpty)
+          .map((e) => e.toString());
+      return parts.isNotEmpty ? parts.join(', ') : v.toString();
+    }
+    return v.toString();
+  }
+
   Widget _buildWebScanner() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -624,7 +640,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Entrez ou collez le code QR de la réservation',
+                  'Scannez avec la caméra ou entrez le code manuellement',
                   style: TextStyle(color: Colors.white70, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -632,6 +648,34 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
             ),
           ),
           const SizedBox(height: 24),
+
+          // ═══ Two scanning options ═══
+          Row(
+            children: [
+              // Option 1: Camera scan dialog
+              Expanded(
+                child: _buildOptionCard(
+                  icon: Icons.camera_alt,
+                  title: 'Scanner avec caméra',
+                  subtitle: 'Ouvrir la caméra pour scanner',
+                  color: Colors.teal,
+                  onTap: _isProcessing ? null : () => _openCameraDialog(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Option 2: Manual input
+              Expanded(
+                child: _buildOptionCard(
+                  icon: Icons.keyboard,
+                  title: 'Entrer le code',
+                  subtitle: 'Coller le code QR manuellement',
+                  color: AppColor.navy,
+                  onTap: null, // always visible below
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
 
           // Manual QR input
           TextField(
@@ -652,30 +696,25 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
               ),
             ),
             style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
+            onSubmitted: (_) => _processManualQR(),
           ),
           const SizedBox(height: 16),
 
-          // Action buttons row
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isProcessing ? null : () => _processManualQR(),
-                  icon: _isProcessing
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check_circle, color: Colors.white),
-                  label: Text(
-                    _isProcessing ? 'Traitement...' : 'Valider (Check-in / Check-out)',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColor.navy,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
+          // Action button
+          ElevatedButton.icon(
+            onPressed: _isProcessing ? null : () => _processManualQR(),
+            icon: _isProcessing
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.check_circle, color: Colors.white),
+            label: Text(
+              _isProcessing ? 'Traitement...' : 'Valider (Check-in / Check-out)',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColor.navy,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
           const SizedBox(height: 24),
 
@@ -701,15 +740,148 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
                   ),
                   const SizedBox(height: 12),
                   _buildHelpStep('1', 'Le client ouvre sa réservation et affiche le QR code'),
-                  _buildHelpStep('2', 'Copiez le code affiché sous le QR (32 caractères hex)'),
-                  _buildHelpStep('3', 'Collez-le ici et cliquez "Valider"'),
-                  _buildHelpStep('4', '1er scan = Check-in (entrée) • 2ème scan = Check-out (sortie)'),
+                  _buildHelpStep('2', 'Scannez avec la caméra ou copiez le code (32 caractères hex)'),
+                  _buildHelpStep('3', 'Collez-le et cliquez "Valider"'),
+                  _buildHelpStep('4', 'Check-out (sortie)'),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOptionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+          color: color.withOpacity(0.05),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: 8),
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13), textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[600]), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openCameraDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        bool dialogProcessing = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dialog header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: AppColor.navy,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.camera_alt, color: Colors.white),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text('Scanner avec caméra', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Camera view
+                  SizedBox(
+                    height: 350,
+                    width: double.infinity,
+                    child: dialogProcessing
+                        ? const Center(child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('Validation en cours...'),
+                            ],
+                          ))
+                        : ClipRRect(
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                            child: MobileScanner(
+                              onDetect: (capture) async {
+                                if (dialogProcessing) return;
+                                final barcodes = capture.barcodes;
+                                for (final barcode in barcodes) {
+                                  final code = barcode.rawValue;
+                                  if (code != null && code.isNotEmpty) {
+                                    setDialogState(() => dialogProcessing = true);
+                                    try {
+                                      final result = await BookingService.adminValidateQRCode(code);
+                                      if (mounted) {
+                                        Navigator.of(ctx).pop();
+                                        if (result != null) {
+                                          setState(() => _lastScanResult = result);
+                                          final action = result['data']?['action']?.toString() ?? 'checkin';
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(action == 'checkout' ? '✅ Check-out effectué !' : '✅ Check-in effectué !'),
+                                              backgroundColor: action == 'checkout' ? Colors.blue : Colors.green,
+                                            ),
+                                          );
+                                          _loadDashboardData();
+                                        } else {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('❌ QR code invalide ou expiré'), backgroundColor: Colors.red),
+                                          );
+                                        }
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        Navigator.of(ctx).pop();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+                                        );
+                                      }
+                                    }
+                                    break;
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -733,7 +905,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
 
   Widget _buildScanResultCard() {
     final data = _lastScanResult!['data'] ?? {};
-    final action = data['action'] ?? 'unknown';
+    final action = _str(data['action']).isEmpty ? 'unknown' : _str(data['action']);
     final booking = data['booking'] ?? {};
     final user = booking['user'] ?? {};
     final vehicle = booking['vehicle'];
@@ -759,23 +931,66 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
                   size: 28,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  isCheckIn ? 'CHECK-IN EFFECTUÉ' : isCheckOut ? 'CHECK-OUT EFFECTUÉ' : action.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isCheckIn ? Colors.green.shade700 : Colors.blue.shade700,
+                Expanded(
+                  child: Text(
+                    isCheckIn ? 'CHECK-IN EFFECTUÉ' : isCheckOut ? 'CHECK-OUT EFFECTUÉ' : action.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isCheckIn ? Colors.green.shade700 : Colors.blue.shade700,
+                    ),
                   ),
                 ),
               ],
             ),
             const Divider(height: 24),
-            _buildInfoRow(Icons.person, 'Client', user['name'] ?? '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'),
-            if (user['email'] != null) _buildInfoRow(Icons.email, 'Email', user['email']),
-            if (vehicle != null) _buildInfoRow(Icons.directions_car, 'Véhicule', '${vehicle['make'] ?? ''} ${vehicle['model'] ?? ''} — ${vehicle['licensePlate'] ?? ''}'),
-            _buildInfoRow(Icons.local_parking, 'Parking', parking['name'] ?? ''),
-            if (parking['address'] != null) _buildInfoRow(Icons.location_on, 'Adresse', parking['address']),
-            _buildInfoRow(Icons.info, 'Statut', booking['status'] ?? ''),
+            _buildInfoRow(Icons.person, 'Client', _str(user['name']).isNotEmpty ? _str(user['name']) : '${_str(user['firstName'])} ${_str(user['lastName'])}'.trim()),
+            if (_str(user['email']).isNotEmpty) _buildInfoRow(Icons.email, 'Email', _str(user['email'])),
+            if (vehicle != null) _buildInfoRow(Icons.directions_car, 'Véhicule', '${_str(vehicle['make'])} ${_str(vehicle['model'])} — ${_str(vehicle['licensePlate'])}'),
+            _buildInfoRow(Icons.local_parking, 'Parking', _str(parking['name'])),
+            if (_str(parking['address']).isNotEmpty) _buildInfoRow(Icons.location_on, 'Adresse', _str(parking['address'])),
+            _buildInfoRow(Icons.info, 'Statut', _str(booking['status'])),
+
+            // Pricing section for checkout
+            if (isCheckOut && booking['pricing'] != null) ...[
+              const Divider(height: 24),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.receipt_long, color: Colors.amber, size: 20),
+                        SizedBox(width: 6),
+                        Text('MONTANT À ENCAISSER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.brown)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (booking['duration']?['display'] != null)
+                      _buildInfoRow(Icons.timer, 'Durée', _str(booking['duration']['display'])),
+                    _buildInfoRow(Icons.monetization_on, 'Tarif/h', '${_str(booking['pricing']['rate'])} DT'),
+                    _buildInfoRow(Icons.receipt, 'Sous-total', '${_str(booking['pricing']['subtotal'])} DT'),
+                    _buildInfoRow(Icons.percent, 'TVA (19%)', '${_str(booking['pricing']['tax'])} DT'),
+                    const Divider(height: 16),
+                    Row(
+                      children: [
+                        const Icon(Icons.payments, size: 22, color: Colors.green),
+                        const SizedBox(width: 8),
+                        const Text('TOTAL: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
+                        Text('${_str(booking['pricing']['total'])} DT',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -811,7 +1026,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
       final result = await BookingService.adminValidateQRCode(code);
       if (result != null && mounted) {
         setState(() => _lastScanResult = result);
-        final action = result['data']?['action'] ?? 'checkin';
+        final action = result['data']?['action']?.toString() ?? 'checkin';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(action == 'checkout' ? '✅ Check-out effectué !' : '✅ Check-in effectué !'),

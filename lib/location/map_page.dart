@@ -525,6 +525,8 @@ class _MapPageState extends State<MapPage> {
           : FloatingActionButton(
               onPressed: _goToCurrentLocation,
               backgroundColor: AppColor.navy,
+              foregroundColor: Colors.white,
+              tooltip: 'Aller à ma position',
               child: const Icon(Icons.my_location),
             ),
     );

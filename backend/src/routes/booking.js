@@ -140,6 +140,149 @@ async function sendReservationEmail(user, booking, parking, vehicle) {
   }
 }
 
+// Helper to send checkout receipt email
+async function sendCheckoutReceiptEmail(user, booking, parking, vehicle) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) return;
+
+  const parkingAddress = parking.address
+    ? (typeof parking.address === 'object'
+        ? `${parking.address.street || ''}, ${parking.address.city || ''}`.trim().replace(/^,\s*/, '')
+        : parking.address)
+    : 'Non spécifiée';
+
+  const vehicleInfo = vehicle
+    ? `${vehicle.make || ''} ${vehicle.model || ''} — ${vehicle.licensePlate || ''}`.trim()
+    : 'Aucun véhicule';
+
+  const checkIn = booking.checkInTime ? new Date(booking.checkInTime) : new Date(booking.startTime);
+  const checkOut = booking.checkOutTime ? new Date(booking.checkOutTime) : new Date();
+  const durationMs = checkOut - checkIn;
+  const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+  const durationMinutes = Math.round((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+  const durationStr = durationHours >= 1
+    ? `${durationHours}h${durationMinutes > 0 ? ` ${durationMinutes}min` : ''}`
+    : `${durationMinutes}min`;
+
+  const pricing = booking.pricing || {};
+  const rate = (pricing.rate || 0).toFixed(2);
+  const subtotal = (pricing.subtotal || 0).toFixed(2);
+  const tax = (pricing.tax || 0).toFixed(2);
+  const total = (pricing.total || 0).toFixed(2);
+
+  const checkInStr = checkIn.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+  const checkOutStr = checkOut.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+      .header { background: linear-gradient(135deg, #1b5e20, #2e7d32); padding: 30px; text-align: center; }
+      .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+      .header p { color: #c8e6c9; margin: 8px 0 0; font-size: 14px; }
+      .icon { font-size: 48px; margin-bottom: 10px; }
+      .body { padding: 30px; }
+      .receipt-badge { background: #e8f5e9; color: #2e7d32; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 24px; }
+      .detail-card { background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 4px solid #2e7d32; }
+      .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
+      .detail-row:last-child { border-bottom: none; }
+      .detail-label { color: #666; font-size: 14px; }
+      .detail-value { color: #1a237e; font-weight: 600; font-size: 14px; }
+      .pricing-card { background: #fff8e1; border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 4px solid #f9a825; }
+      .pricing-row { display: flex; justify-content: space-between; padding: 6px 0; }
+      .pricing-label { color: #555; font-size: 14px; }
+      .pricing-value { color: #333; font-weight: 500; font-size: 14px; }
+      .total-row { display: flex; justify-content: space-between; padding: 12px 0 0; margin-top: 8px; border-top: 2px solid #f9a825; }
+      .total-label { color: #333; font-weight: bold; font-size: 18px; }
+      .total-value { color: #2e7d32; font-weight: bold; font-size: 22px; }
+      .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="icon">🧾</div>
+        <h1>Smart Parking</h1>
+        <p>Reçu de stationnement</p>
+      </div>
+      <div class="body">
+        <div class="receipt-badge">✅ Stationnement terminé</div>
+
+        <p style="color:#333;">Bonjour <strong>${user.firstName || 'Client'}</strong>,</p>
+        <p style="color:#555;">Voici le reçu de votre stationnement :</p>
+
+        <div class="detail-card">
+          <div class="detail-row">
+            <span class="detail-label">🏢 Parking</span>
+            <span class="detail-value">${parking.name || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📍 Adresse</span>
+            <span class="detail-value">${parkingAddress}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🚗 Véhicule</span>
+            <span class="detail-value">${vehicleInfo}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📥 Check-in</span>
+            <span class="detail-value">${checkInStr}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📤 Check-out</span>
+            <span class="detail-value">${checkOutStr}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">⏱️ Durée réelle</span>
+            <span class="detail-value">${durationStr}</span>
+          </div>
+        </div>
+
+        <div class="pricing-card">
+          <h3 style="margin:0 0 12px; color:#f9a825;">💰 Détail de facturation</h3>
+          <div class="pricing-row">
+            <span class="pricing-label">Tarif horaire</span>
+            <span class="pricing-value">${rate} DT/h</span>
+          </div>
+          <div class="pricing-row">
+            <span class="pricing-label">Sous-total</span>
+            <span class="pricing-value">${subtotal} DT</span>
+          </div>
+          <div class="pricing-row">
+            <span class="pricing-label">TVA (19%)</span>
+            <span class="pricing-value">${tax} DT</span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">TOTAL</span>
+            <span class="total-value">${total} DT</span>
+          </div>
+        </div>
+
+        <p style="color:#888; font-size:13px; text-align:center;">Merci d'avoir utilisé Smart Parking ! 🙏</p>
+      </div>
+      <div class="footer">
+        <p>© ${new Date().getFullYear()} Smart Parking — Stationnement intelligent en Tunisie</p>
+      </div>
+    </div>
+  </body>
+  </html>`;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: user.email,
+      subject: `🧾 Reçu de stationnement — ${parking.name || 'Smart Parking'} (${total} DT)`,
+      html,
+    });
+    console.log(`[Email] ✅ Checkout receipt sent to ${user.email}`);
+  } catch (emailError) {
+    console.error('[Email] ❌ Checkout receipt error:', emailError.message);
+  }
+}
+
 // Validation rules
 const createBookingValidation = [
   body('parkingId')
@@ -688,23 +831,25 @@ router.put('/:id/cancel', protect, async (req, res) => {
     }
 
     // Check if booking can be cancelled
-    if (!['pending', 'confirmed'].includes(booking.status)) {
+    if (!['pending', 'confirmed', 'active'].includes(booking.status)) {
       return res.status(400).json({
         success: false,
         message: 'Booking cannot be cancelled at this stage'
       });
     }
 
-    // Check cancellation policy (e.g., 2 hours before start time)
-    const now = new Date();
-    const startTime = new Date(booking.startTime);
-    const hoursUntilStart = (startTime - now) / (1000 * 60 * 60);
+    // Check cancellation policy (2 hours before start time) - only for pending/confirmed
+    if (['pending', 'confirmed'].includes(booking.status)) {
+      const now = new Date();
+      const startTime = new Date(booking.startTime);
+      const hoursUntilStart = (startTime - now) / (1000 * 60 * 60);
 
-    if (hoursUntilStart < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking cannot be cancelled less than 2 hours before start time'
-      });
+      if (hoursUntilStart < 2 && hoursUntilStart > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Booking cannot be cancelled less than 2 hours before start time'
+        });
+      }
     }
 
     await booking.cancel('user_cancelled');
@@ -790,7 +935,9 @@ router.put('/:id/checkout', protect, async (req, res) => {
       _id: req.params.id,
       user: req.user._id,
       status: 'active'
-    });
+    }).populate('user', 'firstName lastName email')
+      .populate('parking', 'name address pricing')
+      .populate('vehicle', 'make model licensePlate');
 
     if (!booking) {
       return res.status(404).json({
@@ -801,10 +948,38 @@ router.put('/:id/checkout', protect, async (req, res) => {
 
     await booking.checkOut();
 
+    // Calculate duration for response
+    const checkIn = booking.checkInTime || booking.startTime;
+    const checkOut = booking.checkOutTime;
+    const durationMs = checkOut - checkIn;
+    const durationHours = Math.ceil(durationMs / (1000 * 60 * 60));
+    const durationMinutes = Math.round(durationMs / (1000 * 60));
+
+    // Send receipt email (async, don't block response)
+    sendCheckoutReceiptEmail(booking.user, booking, booking.parking, booking.vehicle).catch(() => {});
+
+    // Release parking spot
+    if (booking.parking && booking.parking._id) {
+      await Parking.findByIdAndUpdate(booking.parking._id, { $inc: { availableSpots: 1 } });
+    }
+
     res.json({
       success: true,
-      message: 'Checked out successfully',
-      data: { booking }
+      message: 'Check-out effectué avec succès',
+      data: {
+        booking: {
+          id: booking._id,
+          status: booking.status,
+          checkInTime: booking.checkInTime,
+          checkOutTime: booking.checkOutTime,
+          pricing: booking.pricing,
+          duration: {
+            hours: durationHours,
+            minutes: durationMinutes,
+            display: durationHours >= 1 ? `${durationHours}h${durationMinutes % 60 > 0 ? ` ${durationMinutes % 60}min` : ''}` : `${durationMinutes}min`
+          }
+        }
+      }
     });
   } catch (error) {
     console.error('Check-out error:', error);
