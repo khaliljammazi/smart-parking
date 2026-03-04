@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../booking/booking_service.dart';
 import '../utils/backend_api.dart';
 import '../utils/constanst.dart';
@@ -55,6 +56,7 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
   @override
   void dispose() {
     _tabController?.dispose();
+    _manualQrController.dispose();
     super.dispose();
   }
 
@@ -568,6 +570,10 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
   }
 
   Widget _buildScanner() {
+    // On web (Chrome), MobileScanner may not work — show manual input
+    if (kIsWeb) {
+      return _buildWebScanner();
+    }
     return Stack(
       children: [
         MobileScanner(onDetect: _onDetect),
@@ -588,5 +594,244 @@ class _AdminQRScanPageState extends State<AdminQRScanPage>
           ),
       ],
     );
+  }
+
+  final TextEditingController _manualQrController = TextEditingController();
+  Map<String, dynamic>? _lastScanResult;
+
+  Widget _buildWebScanner() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColor.navy, Color(0xFF283593)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.qr_code_scanner, size: 48, color: Colors.white),
+                SizedBox(height: 12),
+                Text(
+                  'Scanner QR Code',
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Entrez ou collez le code QR de la réservation',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Manual QR input
+          TextField(
+            controller: _manualQrController,
+            decoration: InputDecoration(
+              labelText: 'Code QR de la réservation',
+              hintText: 'Collez le code ici (ex: a1b2c3d4e5f6...)',
+              prefixIcon: const Icon(Icons.qr_code),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _manualQrController.clear();
+                  setState(() => _lastScanResult = null);
+                },
+              ),
+            ),
+            style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
+          ),
+          const SizedBox(height: 16),
+
+          // Action buttons row
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _isProcessing ? null : () => _processManualQR(),
+                  icon: _isProcessing
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.check_circle, color: Colors.white),
+                  label: Text(
+                    _isProcessing ? 'Traitement...' : 'Valider (Check-in / Check-out)',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColor.navy,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Result display
+          if (_lastScanResult != null) _buildScanResultCard(),
+
+          const SizedBox(height: 24),
+
+          // Help section
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.help_outline, color: AppColor.navy),
+                      SizedBox(width: 8),
+                      Text('Comment ça marche ?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildHelpStep('1', 'Le client ouvre sa réservation et affiche le QR code'),
+                  _buildHelpStep('2', 'Copiez le code affiché sous le QR (32 caractères hex)'),
+                  _buildHelpStep('3', 'Collez-le ici et cliquez "Valider"'),
+                  _buildHelpStep('4', '1er scan = Check-in (entrée) • 2ème scan = Check-out (sortie)'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: AppColor.navy.withOpacity(0.1),
+            child: Text(number, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColor.navy)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanResultCard() {
+    final data = _lastScanResult!['data'] ?? {};
+    final action = data['action'] ?? 'unknown';
+    final booking = data['booking'] ?? {};
+    final user = booking['user'] ?? {};
+    final vehicle = booking['vehicle'];
+    final parking = booking['parking'] ?? {};
+    final isCheckIn = action == 'checkin';
+    final isCheckOut = action == 'checkout';
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isCheckIn ? Colors.green.shade50 : isCheckOut ? Colors.blue.shade50 : Colors.orange.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Action badge
+            Row(
+              children: [
+                Icon(
+                  isCheckIn ? Icons.login : isCheckOut ? Icons.logout : Icons.info,
+                  color: isCheckIn ? Colors.green : Colors.blue,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  isCheckIn ? 'CHECK-IN EFFECTUÉ' : isCheckOut ? 'CHECK-OUT EFFECTUÉ' : action.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isCheckIn ? Colors.green.shade700 : Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            _buildInfoRow(Icons.person, 'Client', user['name'] ?? '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'),
+            if (user['email'] != null) _buildInfoRow(Icons.email, 'Email', user['email']),
+            if (vehicle != null) _buildInfoRow(Icons.directions_car, 'Véhicule', '${vehicle['make'] ?? ''} ${vehicle['model'] ?? ''} — ${vehicle['licensePlate'] ?? ''}'),
+            _buildInfoRow(Icons.local_parking, 'Parking', parking['name'] ?? ''),
+            if (parking['address'] != null) _buildInfoRow(Icons.location_on, 'Adresse', parking['address']),
+            _buildInfoRow(Icons.info, 'Statut', booking['status'] ?? ''),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text('$label: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey[700])),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processManualQR() async {
+    final code = _manualQrController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez entrer un code QR'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    try {
+      final result = await BookingService.adminValidateQRCode(code);
+      if (result != null && mounted) {
+        setState(() => _lastScanResult = result);
+        final action = result['data']?['action'] ?? 'checkin';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(action == 'checkout' ? '✅ Check-out effectué !' : '✅ Check-in effectué !'),
+            backgroundColor: action == 'checkout' ? Colors.blue : Colors.green,
+          ),
+        );
+        _loadDashboardData();
+      } else if (mounted) {
+        setState(() => _lastScanResult = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ QR code invalide ou expiré'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+    if (mounted) setState(() => _isProcessing = false);
   }
 }

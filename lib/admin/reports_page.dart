@@ -185,6 +185,19 @@ class _ReportsPageState extends State<ReportsPage>
   Widget _buildSupportTickets() {
     final tickets = (_supportTickets?['tickets'] as List<dynamic>?) ?? [];
 
+    if (tickets.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox, size: 64, color: Colors.grey),
+            SizedBox(height: 12),
+            Text('Aucun signalement', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadReportData,
       child: ListView.builder(
@@ -193,35 +206,193 @@ class _ReportsPageState extends State<ReportsPage>
         itemBuilder: (context, index) {
           final t = tickets[index];
           final user = t['user'] ?? {};
+          final status = t['status'] ?? 'open';
+          final userName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+          final userEmail = user['email'] ?? '';
+          final category = t['category'] ?? 'Autre';
+          final description = t['description'] ?? '';
+          final adminResponse = t['adminResponse'] ?? '';
+
+          Color statusColor;
+          String statusLabel;
+          IconData statusIcon;
+          switch (status) {
+            case 'in_progress':
+              statusColor = Colors.orange;
+              statusLabel = 'En cours';
+              statusIcon = Icons.hourglass_top;
+              break;
+            case 'resolved':
+              statusColor = Colors.green;
+              statusLabel = 'Résolu';
+              statusIcon = Icons.check_circle;
+              break;
+            case 'closed':
+              statusColor = Colors.grey;
+              statusLabel = 'Fermé';
+              statusIcon = Icons.lock;
+              break;
+            default:
+              statusColor = Colors.blue;
+              statusLabel = 'Ouvert';
+              statusIcon = Icons.info;
+          }
+
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8),
-            child: ListTile(
-              title: Text('${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'),
-              subtitle: Column(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Catégorie: ${t['category'] ?? 'Autre'}'),
-                  const SizedBox(height: 6),
-                  Text(t['description'] ?? '', maxLines: 3, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  Text('Statut: ${t['status'] ?? 'open'}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                ],
-              ),
-              isThreeLine: true,
-              trailing: PopupMenuButton<String>(
-                onSelected: (value) async {
-                  final ok = await AdminService.updateSupportTicketStatus(t['_id'], value);
-                  if (ok) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Statut mis à jour')));
-                    _loadReportData();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur lors de la mise à jour'), backgroundColor: Colors.red));
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'in_progress', child: Text('En cours')),
-                  const PopupMenuItem(value: 'resolved', child: Text('Résolu')),
-                  const PopupMenuItem(value: 'closed', child: Text('Fermé')),
+                  // Header: user + status badge
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppColor.navy.withOpacity(0.1),
+                        child: Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColor.navy),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(userName.isNotEmpty ? userName : 'Utilisateur inconnu',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                            if (userEmail.isNotEmpty)
+                              Text(userEmail, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 14, color: statusColor),
+                            const SizedBox(width: 4),
+                            Text(statusLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: statusColor)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Category
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(category, style: TextStyle(fontSize: 12, color: Colors.indigo[700], fontWeight: FontWeight.w500)),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Description
+                  Text(description, style: const TextStyle(fontSize: 14, height: 1.4)),
+
+                  // Admin response (if exists)
+                  if (adminResponse.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border(left: BorderSide(color: Colors.green.shade400, width: 3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.reply, size: 16, color: Colors.green[700]),
+                              const SizedBox(width: 6),
+                              Text('Réponse admin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green[700])),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(adminResponse, style: TextStyle(fontSize: 13, color: Colors.green[900])),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+
+                  // Action buttons
+                  Row(
+                    children: [
+                      // Reply button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showReplyDialog(t),
+                          icon: const Icon(Icons.reply, size: 18),
+                          label: Text(adminResponse.isNotEmpty ? 'Modifier la réponse' : 'Répondre'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColor.navy,
+                            side: const BorderSide(color: AppColor.navy),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Status dropdown
+                      PopupMenuButton<String>(
+                        tooltip: 'Changer le statut',
+                        onSelected: (value) async {
+                          final ok = await AdminService.updateSupportTicketStatus(t['_id'], value);
+                          if (ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Statut mis à jour → ${_statusText(value)}'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _loadReportData();
+                          } else if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Erreur lors de la mise à jour'), backgroundColor: Colors.red),
+                            );
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(value: 'in_progress', child: Text('📋 En cours')),
+                          const PopupMenuItem(value: 'resolved', child: Text('✅ Résolu')),
+                          const PopupMenuItem(value: 'closed', child: Text('🔒 Fermé')),
+                        ],
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.swap_horiz, size: 18, color: Colors.grey),
+                              SizedBox(width: 4),
+                              Text('Statut', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -229,6 +400,165 @@ class _ReportsPageState extends State<ReportsPage>
         },
       ),
     );
+  }
+
+  String _statusText(String s) {
+    switch (s) {
+      case 'in_progress': return 'En cours';
+      case 'resolved': return 'Résolu';
+      case 'closed': return 'Fermé';
+      default: return s;
+    }
+  }
+
+  Future<void> _showReplyDialog(Map<String, dynamic> ticket) async {
+    final controller = TextEditingController(text: ticket['adminResponse'] ?? '');
+    String? selectedStatus;
+    bool isSending = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.reply_all, color: AppColor.navy),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('Répondre au signalement', style: TextStyle(fontSize: 18))),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Ticket info
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${ticket['user']?['firstName'] ?? ''} ${ticket['user']?['lastName'] ?? ''}'.trim(),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(ticket['description'] ?? '', style: TextStyle(fontSize: 13, color: Colors.grey[700]),  maxLines: 3, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Reply text
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      labelText: 'Votre réponse',
+                      hintText: 'Tapez votre réponse ici... (sera envoyée par email)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.mail_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Optional new status
+                  DropdownButtonFormField<String>(
+                    value: selectedStatus,
+                    decoration: InputDecoration(
+                      labelText: 'Nouveau statut (optionnel)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.swap_horiz),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('Ne pas changer')),
+                      DropdownMenuItem(value: 'in_progress', child: Text('📋 En cours')),
+                      DropdownMenuItem(value: 'resolved', child: Text('✅ Résolu')),
+                      DropdownMenuItem(value: 'closed', child: Text('🔒 Fermé')),
+                    ],
+                    onChanged: (v) => setDialogState(() => selectedStatus = v),
+                  ),
+
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Un email sera envoyé au client avec votre réponse',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSending ? null : () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton.icon(
+                onPressed: isSending
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Veuillez entrer une réponse'), backgroundColor: Colors.orange),
+                          );
+                          return;
+                        }
+                        setDialogState(() => isSending = true);
+                        final ok = await AdminService.replyToSupportTicket(
+                          ticket['_id'],
+                          controller.text.trim(),
+                          newStatus: selectedStatus,
+                        );
+                        setDialogState(() => isSending = false);
+                        if (ok) {
+                          Navigator.pop(ctx, true);
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Erreur lors de l\'envoi'), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      },
+                icon: isSending
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.send, size: 18, color: Colors.white),
+                label: Text(isSending ? 'Envoi...' : 'Envoyer & Email', style: const TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.navy,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Réponse envoyée et email envoyé au client'), backgroundColor: Colors.green),
+      );
+      _loadReportData();
+    }
   }
 
   Future<void> _exportPDF() async {

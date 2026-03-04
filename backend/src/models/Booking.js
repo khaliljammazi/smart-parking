@@ -259,9 +259,8 @@ bookingSchema.pre('save', async function(next) {
     const crypto = require('crypto');
     this.qrCode = crypto.randomBytes(16).toString('hex');
 
-    // Set QR code expiry (15 minutes after start time)
-    const qrValidityMinutes = parseInt(process.env.QR_VALIDITY_MINUTES) || 15;
-    this.qrCodeExpires = new Date(this.startTime.getTime() + (qrValidityMinutes * 60 * 1000));
+    // QR code stays valid until 1 hour after booking ends
+    this.qrCodeExpires = new Date(this.endTime.getTime() + (60 * 60 * 1000));
     this.qrCodeGenerated = new Date();
   }
 
@@ -281,7 +280,6 @@ bookingSchema.statics.findActiveBookings = function() {
 bookingSchema.statics.findByQRCode = function(qrCode) {
   return this.findOne({
     qrCode,
-    qrCodeExpires: { $gt: new Date() },
     status: { $in: ['confirmed', 'active'] }
   }).populate('user parking vehicle');
 };

@@ -602,14 +602,17 @@ router.put('/support/tickets/:id/status', protect, requireAdmin, async (req, res
 </html>`;
 
         try {
-          await transporter.sendMail({
+          console.log('[Email] Attempting to send resolution email to:', ticket.user.email);
+          const info = await transporter.sendMail({
             from: process.env.EMAIL_USER || process.env.GMAIL_USER,
             to: ticket.user.email,
             subject: `${statusIcon} Smart Parking — Votre réclamation est ${statusLabel.toLowerCase()} (#${ticket._id.toString().slice(-8).toUpperCase()})`,
             html,
           });
+          console.log('[Email] ✅ Resolution email sent successfully! MessageId:', info.messageId);
         } catch (emailErr) {
-          console.error('Resolution email error:', emailErr);
+          console.error('[Email] ❌ Resolution email FAILED:', emailErr.message);
+          console.error('[Email] Full error:', emailErr);
         }
       }
     }
@@ -856,6 +859,11 @@ const adminTransporter = nodemailer.createTransport({
   },
 });
 
+// Verify SMTP connection on module load
+adminTransporter.verify()
+  .then(() => console.log('[Email] ✅ SMTP transporter verified — ready to send emails'))
+  .catch((err) => console.error('[Email] ❌ SMTP transporter verification FAILED:', err.message));
+
 // @route   PUT /api/admin/support/tickets/:id/respond
 // @desc    Admin responds to a support ticket and sends email to user
 // @access  Private (Admin only)
@@ -949,14 +957,20 @@ router.put('/support/tickets/:id/respond', protect, requireAdmin, async (req, re
 </html>`;
 
       try {
-        await adminTransporter.sendMail({
+        console.log('[Email] Attempting to send reply email to:', ticket.user.email);
+        console.log('[Email] Using SMTP:', process.env.EMAIL_HOST || 'smtp.gmail.com', ':', process.env.EMAIL_PORT || '587');
+        console.log('[Email] From:', process.env.EMAIL_USER || process.env.GMAIL_USER);
+        
+        const info = await adminTransporter.sendMail({
           from: process.env.EMAIL_USER || process.env.GMAIL_USER,
           to: ticket.user.email,
           subject: `${statusIcon} Smart Parking — Réponse à votre réclamation ${ticket.category} (${ticketRef})`,
           html,
         });
+        console.log('[Email] ✅ Reply email sent successfully! MessageId:', info.messageId);
       } catch (emailErr) {
-        console.error('Reply email error:', emailErr);
+        console.error('[Email] ❌ Reply email FAILED:', emailErr.message);
+        console.error('[Email] Full error:', emailErr);
       }
     }
 

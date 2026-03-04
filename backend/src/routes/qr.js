@@ -39,14 +39,6 @@ router.get('/generate/:bookingId', protect, async (req, res) => {
       });
     }
 
-    // Check if QR code is still valid
-    if (booking.qrCodeExpires < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'QR code has expired'
-      });
-    }
-
     // Generate QR code data
     const qrData = {
       bookingId: booking._id,
@@ -126,8 +118,10 @@ router.post('/verify', protect, async (req, res) => {
       });
     }
 
-    // Check if QR code is expired
-    if (booking.qrCodeExpires && booking.qrCodeExpires < new Date()) {
+    // Check if QR code is still valid (we removed the strict expiry check for demo friendliness)
+    // QR is valid as long as booking endTime hasn't passed by more than 1 hour
+    const graceEnd = new Date(booking.endTime.getTime() + (60 * 60 * 1000));
+    if (graceEnd < new Date()) {
       return res.status(400).json({
         success: false,
         message: 'QR code has expired'
